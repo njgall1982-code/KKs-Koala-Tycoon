@@ -1,8 +1,6 @@
 -- Koala System - Animation and Wandering
 local RunService = game:GetService("RunService")
-
 print("[KoalaSystem] ===== SCRIPT STARTING =====")
-
 -- Config
 local WALK_SPEED = 3 -- Slow, lazy koala
 local WADDLE_SWING = 20
@@ -20,22 +18,17 @@ local FOLLOW_DIST_MIN = 6
 local FOLLOW_DIST_TELEPORT = 35
 local FOLLOW_SPEED_CATCHUP = 18
 local FOLLOW_SPEED_WALK = 6
-
 local CollectionService = game:GetService("CollectionService")
 local KOALA_TAG = "KoalaNPC"
-
 -- Store state for each koala
 local koalaStates = {}
-
 local function initKoala(koala)
 	print("[KoalaSystem] Found new Koala: " .. koala:GetFullName())
 	if not CollectionService:HasTag(koala, KOALA_TAG) then
 		CollectionService:AddTag(koala, KOALA_TAG)
 	end
-
 	local humanoid = koala:FindFirstChild("Humanoid")
 	local hrp = koala:FindFirstChild("HumanoidRootPart")
-
 	-- Detect Rig Type (char1 for old rig, Mesh_0 for new rig, or fallback to first MeshPart)
 	local rigRoot = koala:FindFirstChild("char1") or koala:FindFirstChild("Mesh_0")
 	if not rigRoot then
@@ -46,19 +39,16 @@ local function initKoala(koala)
 			end
 		end
 	end
-
 	if not rigRoot or not humanoid or not hrp then
 		print("[KoalaSystem] Missing core components for " .. koala.Name)
 		koalaStates[koala] = "failed"
 		return false
 	end
-
 	-- Helper to find bones recursively (handles both simple and CC_Base naming)
 	local function findBone(name)
 		-- Exact match first
 		local found = rigRoot:FindFirstChild(name, true)
 		if found and found:IsA("Bone") then return found end
-
 		-- Partial/mapped match
 		local mapping = {
 			["Hips"] = "CC_Base_Hip",
@@ -70,16 +60,13 @@ local function initKoala(koala)
 			["backleg"] = "CC_Base_L_Thigh",
 			["R_backleg"] = "CC_Base_R_Thigh"
 		}
-
 		local mappedName = mapping[name]
 		if mappedName then
 			found = rigRoot:FindFirstChild(mappedName, true)
 			if found and found:IsA("Bone") then return found end
 		end
-
 		return nil
 	end
-
 	local bones = {
 		hips = findBone("Hips"),
 		chest = findBone("chest"),
@@ -90,10 +77,8 @@ local function initKoala(koala)
 		backleg = findBone("backleg"),
 		R_backleg = findBone("R_backleg"),
 	}
-
 	-- Ensure HumanoidRootPart ALWAYS has collision to prevent falling through floor
 	if hrp then hrp.CanCollide = true end
-
 	-- Disable collisions on all visual parts to prevent sticking
 	for _, part in ipairs(koala:GetDescendants()) do
 		if part:IsA("BasePart") and part ~= hrp then
@@ -102,10 +87,8 @@ local function initKoala(koala)
 			part.CanQuery = true -- Still allow mouse detection for tools
 		end
 	end
-
 	humanoid.WalkSpeed = WALK_SPEED
 	humanoid.AutoRotate = true
-
 	-- Ensure everything is unanchored (Unless AI is disabled, e.g. for KK in crate)
 	if not koala:GetAttribute("AI_Disabled") then
 		for _, p in ipairs(koala:GetDescendants()) do
@@ -114,7 +97,6 @@ local function initKoala(koala)
 			end
 		end
 	end
-
 	local state = {
 		koala = koala,
 		humanoid = humanoid,
@@ -145,38 +127,30 @@ local function initKoala(koala)
 			R_backleg = bones.R_backleg and bones.R_backleg.CFrame or CFrame.new(),
 		}
 	}
-
 	-- Check for missing critical bones
 	if not state.bones.hips then
 		print("[KoalaSystem] Warning: No Hip bone found for " .. koala.Name)
 	end
-
 	koalaStates[koala] = state
 	print("[KoalaSystem] Initialized " .. koala.Name .. " successfully!")
 	return true
 end
-
 local function getRandomWanderPoint(koala, spawnPoint)
 	local hrp = koala:FindFirstChild("HumanoidRootPart")
 	if not hrp then return spawnPoint end
-
 	local homePath = koala:GetAttribute("HomeExhibit")
 	local ground = nil
-
 	if homePath then
 		local exhibit = workspace:FindFirstChild(homePath)
 		ground = exhibit and exhibit:FindFirstChild("Ground")
 	end
-
 	if ground then
 		-- Pick a spot strictly within the ground boundaries
 		local size = ground.Size
 		local pos = ground.Position
 		local margin = 3 -- Stay 3 studs away from the walls
-
 		local randomX = (math.random() - 0.5) * (size.X - (margin * 2))
 		local randomZ = (math.random() - 0.5) * (size.Z - (margin * 2))
-
 		return Vector3.new(pos.X + randomX, pos.Y, pos.Z + randomZ)
 	else
 		-- Fallback to the old random circle if no home is found
@@ -189,11 +163,9 @@ local function getRandomWanderPoint(koala, spawnPoint)
 		)
 	end
 end
-
 local function findNearestTree(hrp)
 	local nearestTree = nil
 	local nearestDist = 20 -- Max distance to detect trees
-
 	for _, obj in ipairs(workspace:GetDescendants()) do
 		if obj:IsA("Model") and string.find(obj.Name, "Tree") then
 			local treePos = obj:GetPivot().Position
@@ -204,10 +176,8 @@ local function findNearestTree(hrp)
 			end
 		end
 	end
-
 	return nearestTree
 end
-
 local function animateKoala(state, dt)
 	if state.koala:GetAttribute("IsBeingCarried") then
 		local bones = state.bones
@@ -218,60 +188,46 @@ local function animateKoala(state, dt)
 		if bones.R_frontleg then bones.R_frontleg.CFrame = base.R_frontleg * CFrame.Angles(clingAngle, 0, 0) end
 		if bones.backleg then bones.backleg.CFrame = base.backleg * CFrame.Angles(-clingAngle, 0, 0) end
 		if bones.R_backleg then bones.R_backleg.CFrame = base.R_backleg * CFrame.Angles(-clingAngle, 0, 0) end
-
 		-- Reset hips to base
 		if bones.hips then bones.hips.CFrame = base.hips end
 		return
 	end
-
 	local velocity = state.hrp.AssemblyLinearVelocity
 	local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
-
 	-- Fallback to MoveDirection if physics is sleeping
 	if speed < 0.1 then
 		speed = state.humanoid.MoveDirection.Magnitude * WALK_SPEED
 	end
-
 	local isMoving = speed > 0.5 or state.climbPhase == "climbing_up" or state.climbPhase == "climbing_down"
-
 	-- Stop wiggle if stationary on tree
 	if state.climbPhase == "climbing_stay" then
 		isMoving = false
 	end
-
 	local targetSpeed = isMoving and 1 or 0
 	state.currentSpeed = state.currentSpeed + (targetSpeed - state.currentSpeed) * 0.2 -- Faster response
 	state.animTime = state.animTime + dt * WALK_SPEED * state.currentSpeed
-
 	if isMoving and state.currentSpeed > 0.01 then
 		-- Force a minimal speed for animation to ensure it fires
 		if state.currentSpeed < 0.1 then state.currentSpeed = 0.5 end
 	end
-
 	local waddleRad = math.rad(WADDLE_SWING) * state.currentSpeed
 	local bones = state.bones
 	local base = state.baseRotations
-
 	-- Waddle: side-to-side roll and bounce
 	if bones.hips then
 		local waddleAngle = math.sin(state.animTime * WADDLE_SPEED / WALK_SPEED) * waddleRad
 		local bounce = math.abs(math.sin(state.animTime * WADDLE_SPEED / WALK_SPEED * 2)) * 0.1 * state.currentSpeed
-
 		-- Apply waddle and bounce ON TOP of base rotation
 		bones.hips.CFrame = base.hips * CFrame.new(0, bounce, 0) * CFrame.Angles(0, 0, waddleAngle)
 	end
-
 	-- Leg Movement (Pig-like crawl)
 	local legAngle = math.sin(state.animTime * WADDLE_SPEED / WALK_SPEED) * math.rad(20) * state.currentSpeed
-
 	if bones.frontleg then bones.frontleg.CFrame = base.frontleg * CFrame.Angles(legAngle, 0, 0) end
 	if bones.R_frontleg then bones.R_frontleg.CFrame = base.R_frontleg * CFrame.Angles(-legAngle, 0, 0) end
 	if bones.backleg then bones.backleg.CFrame = base.backleg * CFrame.Angles(-legAngle, 0, 0) end
 	if bones.R_backleg then bones.R_backleg.CFrame = base.R_backleg * CFrame.Angles(legAngle, 0, 0) end
-
 	if bones.head then bones.head.CFrame = base.head * CFrame.Angles(math.rad(speed * 2), 0, 0) end
 end
-
 local function updateWander(state, dt)
 	-- Stuck Detection
 	if state.state == "walking" then
@@ -289,17 +245,14 @@ local function updateWander(state, dt)
 		end
 		state.lastPos = state.hrp.Position
 	end
-
 	-- Handle climbing phases
 	if state.climbPhase == "approaching" then
 		if state.treePos then
 			local flatHrp = Vector3.new(state.hrp.Position.X, 0, state.hrp.Position.Z)
 			local flatTree = Vector3.new(state.treePos.X, 0, state.treePos.Z)
 			local dist = (flatTree - flatHrp).Magnitude
-
 			-- If we've been approaching too long, just start the climb
 			state.approachTimer = (state.approachTimer or 0) + dt
-
 			if dist < 3.2 then
 				print("[KoalaSystem] Reached tree, starting climb: " .. state.koala.Name)
 				state.approachTimer = 0
@@ -307,8 +260,7 @@ local function updateWander(state, dt)
 				state.climbProgress = 0
 				state.humanoid.PlatformStand = true 
 				state.hrp.Anchored = true 
-
-				local dir = (flatHrp - flatTree).Unit
+				local dir = (flatHrp - flatTree).Unit 
 				state.climbOffset = dir * 1.4 
 			elseif state.approachTimer > 8 then
 				print("[KoalaSystem] Approach timeout, cancelling climb: " .. state.koala.Name)
@@ -325,15 +277,12 @@ local function updateWander(state, dt)
 	elseif state.climbPhase == "climbing_up" then
 		state.climbProgress = math.min(1, state.climbProgress + dt * CLIMB_VERTICAL_SPEED / CLIMB_HEIGHT)
 		local yPos = state.originalY + (state.climbProgress * CLIMB_HEIGHT)
-
 		-- Position on tree side
 		local targetPos = Vector3.new(state.treePos.X, yPos, state.treePos.Z) + state.climbOffset
 		local lookAt = Vector3.new(state.treePos.X, yPos, state.treePos.Z)
-
 		-- Face the tree AND TILT VERTICAL (Face up, belly to tree)
 		local baseRotation = CFrame.lookAt(targetPos, lookAt)
 		state.hrp.CFrame = baseRotation * CFrame.Angles(math.rad(90), 0, 0)
-
 		if state.climbProgress >= 1 then
 			state.climbPhase = "climbing_stay"
 			state.climbTimer = CLIMB_DURATION
@@ -348,20 +297,16 @@ local function updateWander(state, dt)
 	elseif state.climbPhase == "climbing_down" then
 		state.climbProgress = math.max(0, state.climbProgress - dt * CLIMB_VERTICAL_SPEED / CLIMB_HEIGHT)
 		local yPos = state.originalY + (state.climbProgress * CLIMB_HEIGHT)
-
 		local targetPos = Vector3.new(state.treePos.X, yPos, state.treePos.Z) + state.climbOffset
 		local lookAt = Vector3.new(state.treePos.X, yPos, state.treePos.Z)
-
 		-- Face the tree AND TILT VERTICAL (Face up, belly to tree)
 		local baseRotation = CFrame.lookAt(targetPos, lookAt)
 		state.hrp.CFrame = baseRotation * CFrame.Angles(math.rad(90), 0, 0)
-
 		if state.climbProgress <= 0 then
 			-- Back on ground
 			state.climbPhase = nil
 			state.isClimbing = false
 			state.humanoid.PlatformStand = false
-
 			-- FORCE UPRIGHT AND SOLID: Reset collision and rotation
 			state.hrp.Anchored = false
 			state.hrp.CanCollide = true
@@ -369,24 +314,20 @@ local function updateWander(state, dt)
 			local flatPos = state.hrp.Position
 			state.koala:PivotTo(CFrame.new(flatPos.X, state.originalY, flatPos.Z))
 			state.humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-
 			state.state = "idle"
 			state.idleTimer = math.random(IDLE_TIME_MIN, IDLE_TIME_MAX)
 		end
 		return
 	end
-
 	if state.state == "idle" or state.state == "eating" then
 		state.humanoid:MoveTo(state.hrp.Position)
 		state.idleTimer = state.idleTimer - dt
-
 		if state.idleTimer <= 0 then
 			if state.state == "eating" then
 				state.state = "idle"
 				state.idleTimer = 1 -- Short pause after eating
 				return
 			end
-
 			-- Check for nearby tree to climb
 			local tree = findNearestTree(state.hrp)
 			if tree and math.random() < CLIMB_CHANCE then
@@ -394,7 +335,6 @@ local function updateWander(state, dt)
 				state.isClimbing = true
 				state.climbTarget = tree
 				state.climbPhase = "approaching"
-
 				-- Set originalY to ground level if available
 				local homePath = state.koala:GetAttribute("HomeExhibit")
 				local exhibit = homePath and workspace:FindFirstChild(homePath)
@@ -404,7 +344,6 @@ local function updateWander(state, dt)
 				else
 					state.originalY = state.hrp.Position.Y
 				end
-
 				-- Target the trunk part if it exists
 				local trunk = tree:FindFirstChild("Trunk") or tree
 				state.treePos = trunk:GetPivot().Position
@@ -413,7 +352,6 @@ local function updateWander(state, dt)
 				local homePath = state.koala:GetAttribute("HomeExhibit")
 				local exhibit = homePath and workspace:FindFirstChild(homePath)
 				local feeder = exhibit and exhibit:FindFirstChild("Feeder")
-
 				if feeder then
 					print("[KoalaSystem] " .. state.koala.Name .. " is hungry, going to feeder")
 					state.targetPoint = feeder.Position
@@ -427,7 +365,6 @@ local function updateWander(state, dt)
 				print("[KoalaSystem] " .. state.koala.Name .. " target: " .. tostring(state.targetPoint))
 			end
 		end
-
 		-- RANDOM SLEEPY BUBBLES
 		if state.state == "idle" and math.random() < 0.005 then
 			local Core = require(game:GetService("ServerScriptService").Services.KoalaCoreManager)
@@ -437,10 +374,8 @@ local function updateWander(state, dt)
 		if state.targetPoint then
 			state.humanoid:MoveTo(state.targetPoint)
 			local distance = (state.hrp.Position - state.targetPoint).Magnitude
-
 			-- Wander timeout
 			state.wanderTimer = (state.wanderTimer or 0) + dt
-
 			local maxWanderTime = state.isEatingNext and 25 or 12
 			if distance < 2.5 or state.wanderTimer > maxWanderTime then
 				if state.wanderTimer > maxWanderTime then
@@ -448,12 +383,10 @@ local function updateWander(state, dt)
 				end
 				state.wanderTimer = 0
 				state.targetPoint = nil
-
 				if state.isEatingNext then
 					state.state = "eating"
 					state.idleTimer = 10 -- Eat for 10 seconds
 					state.isEatingNext = false
-
 					-- Visual only: HungerService now handles the actual depletion
 					print("[KoalaSystem] " .. state.koala.Name .. " is eating for show.")
 				else
@@ -466,7 +399,6 @@ local function updateWander(state, dt)
 		end
 	end
 end
-
 local function findKoalas()
 	local tagged = CollectionService:GetTagged(KOALA_TAG)
 	local inWorkspace = {}
@@ -477,12 +409,10 @@ local function findKoalas()
 	end
 	return inWorkspace
 end
-
 local scanTimer = 0
 RunService.Heartbeat:Connect(function(dt)
 	script:SetAttribute("IsRunning", true)
 	script:SetAttribute("LastHeartbeat", os.time())
-
 	scanTimer = scanTimer + dt
 	if scanTimer >= 2 then
 		scanTimer = 0
@@ -492,7 +422,6 @@ RunService.Heartbeat:Connect(function(dt)
 			end
 		end
 	end
-
 	for koala, state in pairs(koalaStates) do
 		if koala.Parent then
 			if state == "failed" then continue end
@@ -500,7 +429,6 @@ RunService.Heartbeat:Connect(function(dt)
 			if not koala:GetAttribute("AI_Disabled") then
 				animateKoala(state, dt)
 				updateWander(state, dt)
-
 				-- Safety Grounding: If not climbing and significantly above ground, drop down
 				if not state.isClimbing and not koala:GetAttribute("IsBeingCarried") then
 					local rayOrigin = state.hrp.Position
@@ -508,7 +436,6 @@ RunService.Heartbeat:Connect(function(dt)
 					local raycastParams = RaycastParams.new()
 					raycastParams.FilterDescendantsInstances = {koala}
 					raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-
 					local result = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
 					if result and result.Distance > 3 then -- Floating too high
 						state.humanoid.PlatformStand = false
@@ -524,5 +451,4 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 end)
-
 print("[KoalaSystem] ===== SCRIPT LOADED =====")

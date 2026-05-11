@@ -1,342 +1,113 @@
 local TycoonService = {}
-
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
-
--- Services
-local CarryService = require(game:GetService("ServerScriptService").Services.CarryService)
-local KoalaCoreManager = require(game:GetService("ServerScriptService").Services.KoalaCoreManager)
-
-local playerRepairs = {}
-
-function TycoonService.ClearProgress(player)
-	print("[TycoonService] Clearing repair progress for: " .. player.Name)
-	for key, _ in pairs(playerRepairs) do
-		if key:find("^" .. player.UserId .. "_") then
-			playerRepairs[key] = nil
-		end
-	end
-end
-
-function TycoonService.UpdateStatus(player, message)
-	local playerGui = player:FindFirstChild("PlayerGui")
-	if not playerGui then return end
-
-	local screenGui = playerGui:FindFirstChild("TutorialUI")
-	if not screenGui then
-		screenGui = Instance.new("ScreenGui", playerGui)
-		screenGui.Name = "TutorialUI"
-		local label = Instance.new("TextLabel", screenGui)
-		label.Name = "Status"
-		label.Size = UDim2.new(0, 500, 0, 60)
-		label.Position = UDim2.new(0.5, -250, 0.05, 0)
-		label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-		label.BackgroundTransparency = 0.4
-		label.TextColor3 = Color3.fromRGB(255, 255, 255)
-		label.TextSize = 22
-		label.Font = Enum.Font.GothamBold
-		label.TextWrapped = true
-		label.Parent = screenGui
-	end
-	screenGui.Status.Visible = true
-	screenGui.Status.Text = message
-
-	task.delay(10, function()
-		if screenGui:FindFirstChild("Status") and screenGui.Status.Text == message then
-			screenGui.Status.Visible = false
-		end
-	end)
-end
-
-function TycoonService.HandleRepair(player, exhibit, part, toolRequired)
-	local char = player.Character
-	local tool = char and char:FindFirstChild(toolRequired)
-
-	if not tool then
-		TycoonService.UpdateStatus(player, "⚠️ Equip your " .. toolRequired .. " to fix this!")
-		return
-	end
-
-	local repairKey = player.UserId .. "_" .. exhibit.Name .. "_" .. part.Name
-	playerRepairs[repairKey] = (playerRepairs[repairKey] or 0) + 1
-
-	if playerRepairs[repairKey] >= 1 then
-		TycoonService.UpdateStatus(player, "✅ Repaired " .. part.Name .. "!")
-
-		-- Visual Repair
-		if part.Name == "BrokenFence" then
-			part.Transparency = 0
-			part.CanCollide = true
-			for _, child in pairs(part:GetChildren()) do
-				if child.Name:find("Visual") or child.Name:find("Broken") then
-					child:Destroy()
-				end
-			end
-			local prompt = part:FindFirstChildOfClass("ProximityPrompt")
-			if prompt then prompt:Destroy() end
-		elseif part.Name == "CollapsedShelter" or part.Name == "Base" then
-			exhibit:SetAttribute("ShelterFixed", true)
-			local model = part.Parent
-			model:SetAttribute("IsFixed", true)
-
-			-- Reposition pieces into a "Fixed" shelter
-			local base = model:FindFirstChild("Base")
-			local r1 = model:FindFirstChild("RoofPiece1")
-			local r2 = model:FindFirstChild("RoofPiece2")
-
-			if base and r1 and r2 then
-				local center = base.Position
-				base.Color = Color3.fromRGB(101, 67, 33)
-
-				r1.CFrame = CFrame.new(center + Vector3.new(2, 3, 0)) * CFrame.Angles(0, 0, math.rad(-45))
-				r2.CFrame = CFrame.new(center + Vector3.new(-2, 3, 0)) * CFrame.Angles(0, 0, math.rad(45))
-
-				r1.Color = Color3.fromRGB(101, 67, 33)
-				r2.Color = Color3.fromRGB(101, 67, 33)
-
-				r1.Anchored = true
-				r2.Anchored = true
-			end
-
-			local prompt = base:FindFirstChildOfClass("ProximityPrompt")
-			if prompt then prompt:Destroy() end
-
-			-- Final Snap Alignment
-			base.CFrame = base.CFrame -- Ensure it's where it should be
-			base.Anchored = true
-		end
-
-		-- Check if exhibit is fully repaired
-		TycoonService.CheckExhibitStatus(exhibit)
-	else
-		TycoonService.UpdateStatus(player, "🔨 Fixing... (" .. playerRepairs[repairKey] .. "/1)")
-	end
-end
-
-function TycoonService.CheckExhibitStatus(exhibit)
-	if exhibit.Name == "TutorialExhibit_Workspace" then
-		local fence = exhibit:FindFirstChild("BrokenFence")
-		if fence and fence.Transparency == 0 then
-			exhibit:SetAttribute("IsRepaired", true)
-		end
-	elseif exhibit.Name == "SecondExhibit_Workspace" then
-		local fence = exhibit:FindFirstChild("BrokenFence")
-		local shelter = exhibit:FindFirstChild("CollapsedShelter")
-		if (not fence or fence.Transparency == 0) and (not shelter or shelter:GetAttribute("IsFixed")) then
-			exhibit:SetAttribute("IsRepaired", true)
-		end
-	end
-end
-
-function TycoonService.InitializePlayer(player)
-	-- Restore visuals based on attributes
-	local ex1 = workspace:FindFirstChild("TutorialExhibit_Workspace")
-	if ex1 and ex1:GetAttribute("IsRepaired") then
-		local fence = ex1:FindFirstChild("BrokenFence")
-		if fence then
-			fence.Transparency = 0
-			fence.CanCollide = true
-			local p = fence:FindFirstChildOfClass("ProximityPrompt")
-			if p then p:Destroy() end
-		end
-	end
-
-	local ex2 = workspace:FindFirstChild("SecondExhibit_Workspace")
-	if ex2 and ex2:GetAttribute("IsRepaired") then
-		local fence = ex2:FindFirstChild("BrokenFence")
-		if fence then
-			fence.Transparency = 0
-			fence.CanCollide = true
-			local p = fence:FindFirstChildOfClass("ProximityPrompt")
-			if p then p:Destroy() end
-		end
-		local shelter = ex2:FindFirstChild("CollapsedShelter")
-		if shelter and shelter:GetAttribute("IsFixed") then
-			-- Logic to snap pieces into place
-			local base = shelter:FindFirstChild("Base")
-			local r1 = shelter:FindFirstChild("RoofPiece1")
-			local r2 = shelter:FindFirstChild("RoofPiece2")
-			if base and r1 and r2 then
-				local center = base.Position
-				base.Color = Color3.fromRGB(101, 67, 33)
-				r1.CFrame = CFrame.new(center + Vector3.new(2, 3, 0)) * CFrame.Angles(0, 0, math.rad(-45))
-				r2.CFrame = CFrame.new(center + Vector3.new(-2, 3, 0)) * CFrame.Angles(0, 0, math.rad(45))
-				r1.Color = Color3.fromRGB(101, 67, 33)
-				r2.Color = Color3.fromRGB(101, 67, 33)
-				r1.Anchored = true
-				r2.Anchored = true
-			end
-		end
-	end
-end
-
-function TycoonService.HandleVetInteraction(player)
-	print("[TycoonService] HandleVetInteraction entered for " .. player.Name)
-	local ex1 = workspace:FindFirstChild("TutorialExhibit_Workspace")
-	local isRepaired = ex1 and ex1:GetAttribute("IsRepaired")
-
-	if not isRepaired then
-		print("[TycoonService] Vet interaction: Exhibit 1 not repaired. Forcing check.")
-		TycoonService.CheckExhibitStatus(ex1) -- Double check just in case
-		isRepaired = ex1:GetAttribute("IsRepaired")
-	end
-
-	if not isRepaired then
-		TycoonService.UpdateStatus(player, "👨‍⚕️ Vet: Almost there! Finish fixing those fence boards first.")
-		return
-	end
-
-	if ex1:FindFirstChild("KK") or player:GetAttribute("Carrying") == "KK" or workspace:FindFirstChild("KK") then
-		TycoonService.UpdateStatus(player, "👨‍⚕️ Vet: You already have KK! Go take care of him.")
-		-- If Vet is still here for some reason, clean him up
-		task.delay(1, function()
-			local vet = workspace:FindFirstChild("HeadVet")
-			if vet then vet:Destroy() end
-		end)
-		return
-	end
-
-	local folder = ServerStorage:FindFirstChild("Koalas to pick from")
-	local kkTemplate = folder and folder:FindFirstChild("Koala")
-	if kkTemplate then
-		local kk = kkTemplate:Clone()
-		kk.Name = "KK"
-		kk:SetAttribute("DisplayName", "KK") -- Fix for Unnamed display
-		
-		CollectionService:AddTag(kk, "KoalaNPC")
-		kk:SetAttribute("HomeExhibit", "TutorialExhibit_Workspace")
-		kk.Parent = workspace
-
-		task.wait(0.1)
-		
-		-- Direct Cuddle-Hold! No crate needed.
-		local success, err = pcall(function()
-			CarryService.PickUp(player, kk)
-		end)
-		
-		if not success then
-			warn("[TycoonService] ❌ Failed to pick up KK: " .. tostring(err))
-		end
-		
-		TycoonService.UpdateStatus(player, "👨‍⚕️ Vet: Carry KK to the exhibit. Click KK and use 'Place' to put him home.")
-		
-		-- Update Quest Dialog UI
-		local QuestService = require(game:GetService("ServerScriptService").Services.QuestService)
-		QuestService.UpdateQuest(player, "🏠 Carry KK to his Exhibit. Click him and use the 'Place' button.")
-
-		task.delay(1, function()
-			local vet = workspace:FindFirstChild("HeadVet")
-			if vet then vet:Destroy() end
-		end)
-	end
-end
-
+local statusEvent = ReplicatedStorage:WaitForChild("UpdateStatus")
+local repairEvent = ReplicatedStorage:WaitForChild("RepairExhibitEvent")
+local refillEvent = ReplicatedStorage:WaitForChild("RefillFeederEvent")
+local FEEDS_FOR_MAX = 5
+local FEED_VALUE = 20
 function TycoonService.Initialize()
-	print("[TycoonService] Initialize() called")
-	local ex1 = workspace:FindFirstChild("TutorialExhibit_Workspace")
-	if ex1 then
-		local fence = ex1:FindFirstChild("BrokenFence")
-		if fence then
-			-- Cleanup old prompts to prevent stacked connections
-			for _, oldP in pairs(fence:GetChildren()) do
-				if oldP:IsA("ProximityPrompt") then oldP:Destroy() end
-			end
-
-			local prompt = Instance.new("ProximityPrompt", fence)
-			prompt.ActionText = "Repair Fence 🔨"
-			prompt.HoldDuration = 0
-			prompt.Triggered:Connect(function(player) TycoonService.HandleRepair(player, ex1, fence, "WoodenHammer") end)
+	-- Listen for Repair requests
+	repairEvent.OnServerEvent:Connect(function(player, exhibitName)
+		local exhibit = workspace:FindFirstChild(exhibitName)
+		if not exhibit then return end
+		
+		-- Check Hammer
+		local char = player.Character
+		if not char or (not char:FindFirstChild("WoodenHammer") and not player.Backpack:FindFirstChild("WoodenHammer")) then
+			TycoonService.UpdateStatus(player, "🔨 You need a hammer to repair this!")
+			return
 		end
-	end
-
-	local ex2 = workspace:FindFirstChild("SecondExhibit_Workspace")
-	if ex2 then
-		local fence = ex2:FindFirstChild("BrokenFence")
-		if fence then
-			-- Cleanup old prompts
-			for _, oldP in pairs(fence:GetChildren()) do
-				if oldP:IsA("ProximityPrompt") then oldP:Destroy() end
-			end
-
-			local prompt = Instance.new("ProximityPrompt", fence)
-			prompt.ActionText = "Repair Fence 🔨"
-			prompt.HoldDuration = 1.0
-			prompt.Triggered:Connect(function(player) TycoonService.HandleRepair(player, ex2, fence, "WoodenHammer") end)
-		end
-
-		local shelter = ex2:FindFirstChild("CollapsedShelter")
-		if shelter then
-			local base = shelter:FindFirstChild("Base")
-			if base then
-				-- Cleanup old prompts
-				for _, oldP in pairs(base:GetChildren()) do
-					if oldP:IsA("ProximityPrompt") then oldP:Destroy() end
-				end
-
-				local prompt = Instance.new("ProximityPrompt", base)
-				prompt.ActionText = "Repair Shelter 🔨"
-				prompt.HoldDuration = 1.5
-				prompt.Triggered:Connect(function(player) TycoonService.HandleRepair(player, ex2, base, "WoodenHammer") end)
-			end
-		end
-
-		local veg = ex2:FindFirstChild("OvergrownVegetation")
-		if veg then
-			for _, bush in pairs(veg:GetChildren()) do
-				-- Cleanup old prompts
-				for _, oldP in pairs(bush:GetChildren()) do
-					if oldP:IsA("ProximityPrompt") then oldP:Destroy() end
-				end
-
-				local prompt = Instance.new("ProximityPrompt", bush)
-				prompt.Name = "ClearPrompt"
-				prompt.ActionText = "Clear Weeds 🧹"
-				prompt.HoldDuration = 1.0
-				prompt.Triggered:Connect(function(player)
-					local char = player.Character
-					local tool = char and char:FindFirstChild("Shovel")
-					if tool then
-						-- Disable prompt immediately to prevent double-clicks during Destroy delay
-						prompt.Enabled = false 
-						bush.Transparency = 1
-						bush.CanCollide = false
-						task.delay(0.5, function() bush:Destroy() end)
-						TycoonService.UpdateStatus(player, "🧹 Weed cleared!")
-					else
-						TycoonService.UpdateStatus(player, "⚠️ Equip your Shovel to clear weeds!")
-					end
-				end)
-			end
-		end
-	end
-
-	local vet = workspace:FindFirstChild("HeadVet") or ServerStorage:FindFirstChild("HeadVet")
-	if vet then
-		local hrp = vet:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			-- Cleanup old prompts
-			for _, oldP in pairs(hrp:GetChildren()) do
-				if oldP:IsA("ProximityPrompt") then oldP:Destroy() end
-			end
-
-			local p = Instance.new("ProximityPrompt")
-			p.Name = "VetPrompt"
-			p.ActionText = "Talk to Head Vet 👨‍⚕️"
-			p.ObjectText = "Head Vet"
-			p.HoldDuration = 0.5
-			p.MaxActivationDistance = 15
-			p.RequiresLineOfSight = false
-			p.Parent = hrp
-
-			p.Triggered:Connect(function(player) 
-				TycoonService.HandleVetInteraction(player) 
-			end)
-		end
-	end
-
-	print("[TycoonService] Initialize() completed")
+		
+		TycoonService.RepairExhibit(player, exhibit)
+	end)
+	
+	-- Listen for Refill requests
+	refillEvent.OnServerEvent:Connect(function(player, exhibitName)
+		local exhibit = workspace:FindFirstChild(exhibitName)
+		if not exhibit then return end
+		TycoonService.RefillFeeder(player, exhibit)
+	end)
+	
+	print("[TycoonService] Initialized and listeners active.")
 end
-
+function TycoonService.UpdateStatus(player, message)
+	statusEvent:FireClient(player, message)
+end
+function TycoonService.InitializePlayer(player)
+	print("[TycoonService] Initializing world for " .. player.Name)
+	-- Initial state: All exhibits unrepaired unless attributes say otherwise
+	for _, child in ipairs(workspace:GetChildren()) do
+		if child:IsA("Folder") and child.Name:find("_Workspace") then
+			if not child:GetAttribute("IsRepaired") then
+				TycoonService.ApplyVisualState(child, false)
+			end
+		end
+	end
+end
+function TycoonService.ApplyVisualState(exhibit, isRepaired)
+	exhibit:SetAttribute("IsRepaired", isRepaired)
+	
+	-- Hide/Show based on repair state
+	local broken = exhibit:FindFirstChild("BrokenState")
+	local repaired = exhibit:FindFirstChild("RepairedState")
+	
+	if broken then
+		for _, p in ipairs(broken:GetDescendants()) do
+			if p:IsA("BasePart") then p.Transparency = isRepaired and 1 or 0 p.CanCollide = not isRepaired end
+		end
+	end
+	
+	if repaired then
+		for _, p in ipairs(repaired:GetDescendants()) do
+			if p:IsA("BasePart") then p.Transparency = isRepaired and 0 or 1 p.CanCollide = isRepaired end
+		end
+	end
+	
+	-- Manage Prompts
+	local ground = exhibit:FindFirstChild("Ground")
+	if ground then
+		local prompt = ground:FindFirstChild("RepairPrompt")
+		if prompt then prompt.Enabled = not isRepaired end
+	end
+end
+function TycoonService.RepairExhibit(player, exhibit)
+	if exhibit:GetAttribute("IsRepaired") then return end
+	
+	local cost = 0 -- Free for now
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if leaderstats and leaderstats.Cash.Value >= cost then
+		leaderstats.Cash.Value -= cost
+		TycoonService.ApplyVisualState(exhibit, true)
+		TycoonService.UpdateStatus(player, "✅ Exhibit Repaired!")
+		
+		-- Special tutorial logic
+		if exhibit.Name == "TutorialExhibit_Workspace" then
+			local QuestService = require(game:GetService("ServerScriptService").Services.QuestService)
+			QuestService.UpdateQuest(player, "🌲 Great! Now go to the Forest and find a Koala to rescue!")
+		end
+	end
+end
+function TycoonService.RefillFeeder(player, exhibit)
+	local leaves = player:GetAttribute("LeafCount") or 0
+	if leaves <= 0 then
+		TycoonService.UpdateStatus(player, "🌿 You need Eucalyptus Leaves to refill the feeder!")
+		return
+	end
+	
+	local currentFood = exhibit:GetAttribute("FoodLevel") or 0
+	if currentFood >= 100 then
+		TycoonService.UpdateStatus(player, "✅ Feeder is already full!")
+		return
+	end
+	
+	-- Use 1 leaf
+	player:SetAttribute("LeafCount", leaves - 1)
+	local newFood = math.min(100, currentFood + FEED_VALUE)
+	exhibit:SetAttribute("FoodLevel", newFood)
+	
+	TycoonService.UpdateStatus(player, "🥗 Feeder Refilled (" .. newFood .. "%)")
+	print("[TycoonService] " .. player.Name .. " refilled " .. exhibit.Name .. " to " .. newFood .. "%")
+end
 return TycoonService

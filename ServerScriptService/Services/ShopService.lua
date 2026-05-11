@@ -1,9 +1,7 @@
 local ShopService = {}
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local openShopEvent = ReplicatedStorage:WaitForChild("OpenShopEvent")
-
 local connections = {} -- toolShed -> connection
-
 function ShopService.Initialize()
 	-- Function to connect a tool shed
 	local function connectToolShed(toolShed)
@@ -26,7 +24,6 @@ function ShopService.Initialize()
 			end)
 		end
 	end
-
 	-- Scan existing
 	for _, desc in pairs(workspace:GetDescendants()) do
 		connectToolShed(desc)
@@ -37,10 +34,8 @@ function ShopService.Initialize()
 	
 	print("[ShopService] Initialized with robust ToolShed monitoring.")
 end
-
 function ShopService.OpenShop(player)
 	openShopEvent:FireClient(player)
 	print("[ShopService] Sent OpenShopEvent to " .. player.Name)
 end
-
 return ShopService

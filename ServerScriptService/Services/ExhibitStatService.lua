@@ -1,8 +1,6 @@
 local ExhibitStatService = {}
-
 local TextService = game:GetService("TextService")
 local Players = game:GetService("Players")
-
 function ExhibitStatService.Initialize()
 	-- Look for all exhibits and create signs
 	for _, exhibit in ipairs(workspace:GetChildren()) do
@@ -10,7 +8,6 @@ function ExhibitStatService.Initialize()
 			ExhibitStatService.CreateSign(exhibit)
 		end
 	end
-	
 	-- Periodically update all signs
 	task.spawn(function()
 		while true do
@@ -22,7 +19,6 @@ function ExhibitStatService.Initialize()
 			end
 		end
 	end)
-	
 	print("[ExhibitStatService] Initialized.")
 	
 	-- Listen for Rename requests from clients
@@ -42,7 +38,6 @@ function ExhibitStatService.Initialize()
 		end
 	end)
 end
-
 function ExhibitStatService.CreateSign(exhibit)
 	-- Look for the board we just placed
 	local anchor = exhibit:FindFirstChild("SignAnchor")
@@ -74,23 +69,19 @@ function ExhibitStatService.CreateSign(exhibit)
 	billboard.AlwaysOnTop = false
 	billboard.MaxDistance = 50
 	billboard.Parent = anchor
-	
 	-- Premium Background (Glassmorphism)
 	local frame = Instance.new("Frame", billboard)
 	frame.Size = UDim2.new(1, 0, 1, 0)
 	frame.BackgroundColor3 = Color3.fromRGB(20, 25, 30)
 	frame.BackgroundTransparency = 0.25
 	frame.BorderSizePixel = 0
-	
 	local uiCorner = Instance.new("UICorner", frame)
 	uiCorner.CornerRadius = UDim.new(0, 12)
-	
 	-- Add a subtle border
 	local uiStroke = Instance.new("UIStroke", frame)
 	uiStroke.Color = Color3.fromRGB(255, 255, 255)
 	uiStroke.Transparency = 0.8
 	uiStroke.Thickness = 2
-	
 	local title = Instance.new("TextLabel", frame)
 	title.Name = "ExhibitName"
 	title.Size = UDim2.new(1, 0, 0.45, 0)
@@ -100,7 +91,6 @@ function ExhibitStatService.CreateSign(exhibit)
 	title.Font = Enum.Font.GothamBold
 	title.TextSize = 22
 	title.BackgroundTransparency = 1
-	
 	local stats = Instance.new("TextLabel", frame)
 	stats.Name = "Stats"
 	stats.Size = UDim2.new(1, 0, 0.5, 0)
@@ -112,17 +102,13 @@ function ExhibitStatService.CreateSign(exhibit)
 	stats.BackgroundTransparency = 1
 	stats.TextYAlignment = Enum.TextYAlignment.Top
 end
-
 function ExhibitStatService.UpdateSign(exhibit)
 	local anchor = exhibit:FindFirstChild("SignAnchor") or exhibit:FindFirstChild("Ground")
 	if not anchor then return end
-	
 	local billboard = anchor:FindFirstChild("StatSign")
 	if not billboard then return end
-	
 	local frame = billboard:FindFirstChild("Frame")
 	if not frame then return end
-	
 	-- Calculate stats
 	local koalaCount = 0
 	for _, child in ipairs(exhibit:GetChildren()) do
@@ -130,13 +116,10 @@ function ExhibitStatService.UpdateSign(exhibit)
 			koalaCount += 1
 		end
 	end
-	
 	local food = exhibit:GetAttribute("FoodLevel") or 0
 	local displayName = exhibit:GetAttribute("DisplayName") or exhibit.Name:gsub("_Workspace", "")
-	
 	frame.ExhibitName.Text = displayName
 	frame.Stats.Text = string.format("🐨 Koalas: %d\n🥗 Food: %d%%", koalaCount, food)
-	
 	-- Color change based on food
 	if food < 20 then
 		frame.Stats.TextColor3 = Color3.fromRGB(255, 100, 100) -- Red alert
@@ -146,17 +129,14 @@ function ExhibitStatService.UpdateSign(exhibit)
 		frame.Stats.TextColor3 = Color3.fromRGB(200, 255, 200) -- Green good
 	end
 end
-
 -- Server-side naming (safely filtered)
 function ExhibitStatService.RenameExhibit(player, exhibit, newName)
 	if not exhibit or not newName then return end
-	
 	-- SAFETY FIRST: Filter the text for Roblox
 	local success, filteredText = pcall(function()
 		local filterResult = TextService:FilterStringAsync(newName, player.UserId)
 		return filterResult:GetNonChatStringForBroadcastAsync()
 	end)
-	
 	if success then
 		exhibit:SetAttribute("DisplayName", filteredText)
 		ExhibitStatService.UpdateSign(exhibit)
@@ -165,5 +145,4 @@ function ExhibitStatService.RenameExhibit(player, exhibit, newName)
 		warn("[ExhibitStatService] Failed to filter text!")
 	end
 end
-
 return ExhibitStatService

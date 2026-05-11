@@ -235,18 +235,6 @@ function KoalaCoreManager.InitKoala(koala, rarityName, startAge)
 				remote.Name = "GlobalAnnounce"
 			end
 			
-			local playerName = "A player"
-			-- Try to find who "owns" this koala/exhibit
-			local home = koala:GetAttribute("HomeExhibit")
-			if home then
-				for _, p in ipairs(game.Players:GetPlayers()) do
-					if p:FindFirstChild("HasExhibit") and p.HasExhibit.Value then
-						-- This is a bit weak, but for now we'll just say "A lucky player"
-						-- unless we can confirm ownership
-					end
-				end
-			end
-			
 			remote:FireAllClients("🌟 A legendary **Ultra Cute** koala was just found! 🐨✨")
 		end)
 	end
@@ -341,8 +329,11 @@ function KoalaCoreManager.RespawnAt(oldKoala, pos, parent)
 	-- Parent to Workspace first (matches Dev Menu logic for stability)
 	newKoala.Parent = workspace
 	
-	-- Drop from 2 studs above the surface for a natural landing
-	newKoala:PivotTo(CFrame.new(pos + Vector3.new(0, 2, 0)))
+	-- Position at the spawn point, offset by half HRP height to prevent clipping into terrain
+	-- HRP is ~1.9 studs tall, so we need to spawn 0.95 studs above the surface
+	local hrp = newKoala:FindFirstChild("HumanoidRootPart")
+	local hrpHeight = hrp and hrp.Size.Y / 2 or 0.95
+	newKoala:PivotTo(CFrame.new(pos + Vector3.new(0, hrpHeight, 0)))
 	
 	-- Parent to exhibit after positioning
 	if parent then newKoala.Parent = parent end
@@ -365,7 +356,7 @@ local function isAdultNearby(babyPos)
 		if koala:IsDescendantOf(workspace) then
 			local stats = koala:FindFirstChild("KoalaStats")
 			local stageVal = stats and stats:FindFirstChild("Stage")
-			if stageVal and stageVal.Value >= 5 then
+			if stageVal and stageVal.Value >= 4 then
 				local hrp = koala:FindFirstChild("HumanoidRootPart")
 				local pivot = hrp and hrp.Position or koala:GetPivot().Position
 				if (babyPos - pivot).Magnitude <= ADULT_PROXIMITY_RADIUS then
@@ -387,7 +378,7 @@ local function growthTick()
 		if not stats then continue end
 
 		local stageVal = stats:FindFirstChild("Stage")
-		if not stageVal or stageVal.Value >= 5 then continue end
+		if not stageVal or stageVal.Value >= 4 then continue end
 
 		local ageVal = stats:FindFirstChild("Age")
 		local cuddleVal = stats:FindFirstChild("LastCuddleTime")

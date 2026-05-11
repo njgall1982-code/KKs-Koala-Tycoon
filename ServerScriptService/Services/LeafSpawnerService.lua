@@ -1,14 +1,10 @@
 local LeafSpawnerService = {}
-
 local CollectionService = game:GetService("CollectionService")
 local ServerStorage = game:GetService("ServerStorage")
-
 local LEAF_TAG = "EucalyptusLeaf"
 local MAX_LEAVES_PER_EXHIBIT = 8
 local SPAWN_INTERVAL = 15 -- Every 15 seconds try to spawn a leaf
-
 local leafTemplate = ServerStorage.Template.TutorialExhibit:FindFirstChild("EucalyptusLeaf")
-
 function LeafSpawnerService.Initialize()
 	if not leafTemplate then
 		warn("[LeafSpawnerService] Missing leaf template in ServerStorage.Template.TutorialExhibit!")
@@ -38,7 +34,6 @@ function LeafSpawnerService.Initialize()
 	for _, leaf in ipairs(CollectionService:GetTagged(LEAF_TAG)) do
 		task.spawn(onLeafAdded, leaf)
 	end
-
 	-- Spawn loop
 	task.spawn(function()
 		while true do
@@ -49,7 +44,6 @@ function LeafSpawnerService.Initialize()
 	
 	print("[LeafSpawnerService] Initialized for all exhibits and pickup listener active.")
 end
-
 function LeafSpawnerService.UpdateAllExhibits()
 	-- Find all exhibit workspaces
 	for _, child in ipairs(workspace:GetChildren()) do
@@ -58,7 +52,6 @@ function LeafSpawnerService.UpdateAllExhibits()
 		end
 	end
 end
-
 function LeafSpawnerService.CheckAndSpawnForExhibit(exhibit)
 	local currentLeaves = CollectionService:GetTagged(LEAF_TAG)
 	local leafCount = 0
@@ -72,7 +65,6 @@ function LeafSpawnerService.CheckAndSpawnForExhibit(exhibit)
 		LeafSpawnerService.SpawnLeaf(exhibit)
 	end
 end
-
 function LeafSpawnerService.SpawnLeaf(exhibit)
 	local trees = {}
 	-- Search descendants to find trees in subfolders like "Trees"
@@ -105,5 +97,4 @@ function LeafSpawnerService.SpawnLeaf(exhibit)
 	
 	CollectionService:AddTag(leaf, LEAF_TAG)
 end
-
 return LeafSpawnerService

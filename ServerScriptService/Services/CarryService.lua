@@ -1,6 +1,5 @@
 local CarryService = {}
 local KoalaCoreManager = require(game:GetService("ServerScriptService").Services.KoalaCoreManager)
-
 function CarryService.Initialize()
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local koalaAction = ReplicatedStorage:WaitForChild("KoalaAction")
@@ -19,7 +18,6 @@ function CarryService.Initialize()
 	end)
 	print("[CarryService] Initialized.")
 end
-
 local function setArms(player, hold)
 	local char = player.Character
 	if not char then return end
@@ -33,7 +31,6 @@ local function setArms(player, hold)
 			end)
 		end
 	end
-
 	local isR15 = hum.RigType == Enum.HumanoidRigType.R15
 	if isR15 then
 		local rArm = char:FindFirstChild("RightUpperArm")
@@ -51,7 +48,6 @@ local function setArms(player, hold)
 		end
 	end
 end
-
 function CarryService.PickUp(player, targetModel, weldTarget, isCuddle)
 	print("[CarryService] PickUp called for " .. player.Name .. " target: " .. (targetModel and targetModel.Name or "nil"))
 	local character = player.Character
@@ -135,7 +131,6 @@ function CarryService.PickUp(player, targetModel, weldTarget, isCuddle)
 		targetModel:SetAttribute("Crated", true)
 	end
 end
-
 function CarryService.PerformCuddle(player, koala)
 	local char = player.Character
 	local hum = char and char:FindFirstChild("Humanoid")
@@ -160,7 +155,6 @@ function CarryService.PerformCuddle(player, koala)
 	hum.WalkSpeed = oldSpeed
 	hum.JumpPower = oldJump
 end
-
 function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 	local character = player.Character
 	if not character then return end
@@ -210,44 +204,29 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 				return -- EXIT: Keep koala in inventory/crate
 			end
 		end
-
 		-- Clean Arms
 		pcall(function() setArms(player, false) end)
 		player:SetAttribute("Carrying", nil)
-
 		-- Clean Respawn!
 		-- Find a nice spawn point (center of exhibit if possible)
 		local spawnPos = dropCFrame.Position
 		if dropParent and dropParent:FindFirstChild("Ground") then
 			local g = dropParent.Ground
-			-- Raycast from sky to ground to find top surface
-			local rayOrigin = Vector3.new(g.Position.X, g.Position.Y + 10, g.Position.Z)
-			local rayDirection = Vector3.new(0, -20, 0)
-			local params = RaycastParams.new()
-			params.FilterType = Enum.RaycastFilterType.Include
-			params.FilterDescendantsInstances = {g}
-			
-			local rayResult = workspace:Raycast(rayOrigin, rayDirection, params)
-			if rayResult then
-				spawnPos = rayResult.Position -- Exactly on the grass
-			else
-				spawnPos = Vector3.new(g.Position.X, g.Position.Y + (g.Size.Y / 2), g.Position.Z)
-			end
+			-- Spawn above terrain level to account for model offset
+			-- Koala model has HRP offset that causes floating
+			spawnPos = Vector3.new(g.Position.X, 5.5, g.Position.Z)
 		end
-
 		local newKoala = KoalaCoreManager.RespawnAt(targetModel, spawnPos, dropParent)
 		
 		-- 3-Second "Sticky" Anchor to prevent falling through floor
 		-- Also disable AI briefly so KoalaSystem doesn't unanchor us early
 		newKoala:SetAttribute("AI_Disabled", true)
-
 		for _, p in pairs(newKoala:GetDescendants()) do
 			if p:IsA("BasePart") then 
 				p.Anchored = true 
 				if p.Name == "HumanoidRootPart" then p.CanCollide = true end
 			end
 		end
-
 		task.delay(3, function()
 			if newKoala and newKoala.Parent then
 				newKoala:SetAttribute("AI_Disabled", nil)
@@ -282,5 +261,4 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 		end
 	end
 end
-
 return CarryService

@@ -1,0 +1,20 @@
+# Roblox Binary Files (Optional: keep only the main one if desired)
+# It's better to version code than binary files on GitHub.
+*.rbxl
+
+# Temporary / System files
+.gemini/
+.DS_Store
+Thumbs.db
+
+# Texture/Export Junk
+*.fbm/
+*.log
+
+# Backup/Old folders (Don't clutter your resume repo)
+Old backups/
+Old KK models/
+Updated KK Cuter/
+Character_output.fbm/
+Meshy_AI_Low_poly_cute_koala__quadruped_Animation_Walking_frame_rate_24.fbm/
+Meshy_AI_Low_poly_cute_koala__quadruped_Character_output.fbm/

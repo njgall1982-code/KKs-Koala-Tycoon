@@ -61,7 +61,7 @@ PRIMARY: We copied the scripts to this folder. We need to keep these in sync.
 4.  **Health Checks**: If a button stops working, check the "Explorer" to see if the `ProximityPrompt` is still there and enabled.
 
 ### 📅 Next Session Goals
-1. **The Fur & Finish**: Apply realistic Koala textures and materials without breaking the custom rig.
+1.
 2. **Happiness System**: Expand the "Hunger" loop into a full "Happiness" meter that impacts the tycoon's income.
 3. **The Store**: Implement the leaf-collection store loop.
 

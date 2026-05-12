@@ -136,42 +136,46 @@ function TycoonService.CheckExhibitStatus(exhibit)
 end
 
 function TycoonService.InitializePlayer(player)
-	-- Restore visuals based on attributes
-	local ex1 = workspace:FindFirstChild("TutorialExhibit_Workspace")
-	if ex1 and ex1:GetAttribute("IsRepaired") then
-		local fence = ex1:FindFirstChild("BrokenFence")
-		if fence then
-			fence.Transparency = 0
-			fence.CanCollide = true
-			local p = fence:FindFirstChildOfClass("ProximityPrompt")
-			if p then p:Destroy() end
-		end
-	end
-
-	local ex2 = workspace:FindFirstChild("SecondExhibit_Workspace")
-	if ex2 and ex2:GetAttribute("IsRepaired") then
-		local fence = ex2:FindFirstChild("BrokenFence")
-		if fence then
-			fence.Transparency = 0
-			fence.CanCollide = true
-			local p = fence:FindFirstChildOfClass("ProximityPrompt")
-			if p then p:Destroy() end
-		end
-		local shelter = ex2:FindFirstChild("CollapsedShelter")
-		if shelter and shelter:GetAttribute("IsFixed") then
-			-- Logic to snap pieces into place
-			local base = shelter:FindFirstChild("Base")
-			local r1 = shelter:FindFirstChild("RoofPiece1")
-			local r2 = shelter:FindFirstChild("RoofPiece2")
-			if base and r1 and r2 then
-				local center = base.Position
-				base.Color = Color3.fromRGB(101, 67, 33)
-				r1.CFrame = CFrame.new(center + Vector3.new(2, 3, 0)) * CFrame.Angles(0, 0, math.rad(-45))
-				r2.CFrame = CFrame.new(center + Vector3.new(-2, 3, 0)) * CFrame.Angles(0, 0, math.rad(45))
-				r1.Color = Color3.fromRGB(101, 67, 33)
-				r2.Color = Color3.fromRGB(101, 67, 33)
-				r1.Anchored = true
-				r2.Anchored = true
+	-- Restore visuals based on attributes for all exhibits
+	for _, exhibit in ipairs(workspace:GetChildren()) do
+		if exhibit:IsA("Folder") and exhibit.Name:find("_Workspace") then
+			if exhibit:GetAttribute("IsRepaired") then
+				-- Restore Fence
+				local fence = exhibit:FindFirstChild("BrokenFence")
+				if fence then
+					fence.Transparency = 0
+					fence.CanCollide = true
+					local p = fence:FindFirstChildOfClass("ProximityPrompt")
+					if p then p:Destroy() end
+					
+					-- Destroy visual rubble
+					for _, child in pairs(fence:GetChildren()) do
+						if child.Name:find("Visual") or child.Name:find("Broken") then
+							child:Destroy()
+						end
+					end
+				end
+				
+				-- Restore Shelter (if applicable)
+				local shelter = exhibit:FindFirstChild("CollapsedShelter")
+				if shelter then
+					local base = shelter:FindFirstChild("Base")
+					local r1 = shelter:FindFirstChild("RoofPiece1")
+					local r2 = shelter:FindFirstChild("RoofPiece2")
+					if base and r1 and r2 then
+						local center = base.Position
+						base.Color = Color3.fromRGB(101, 67, 33)
+						r1.CFrame = CFrame.new(center + Vector3.new(2, 3, 0)) * CFrame.Angles(0, 0, math.rad(-45))
+						r2.CFrame = CFrame.new(center + Vector3.new(-2, 3, 0)) * CFrame.Angles(0, 0, math.rad(45))
+						r1.Color = Color3.fromRGB(101, 67, 33)
+						r2.Color = Color3.fromRGB(101, 67, 33)
+						r1.Anchored = true
+						r2.Anchored = true
+						
+						local p = base:FindFirstChildOfClass("ProximityPrompt")
+						if p then p:Destroy() end
+					end
+				end
 			end
 		end
 	end

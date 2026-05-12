@@ -13,6 +13,30 @@ function ExhibitStatService.Initialize()
 				ExhibitStatService.UpdateSign(exhibit)
 			end)
 			
+			-- Add a ProximityPrompt to the board for Management
+			local anchor = exhibit:FindFirstChild("SignAnchor") or exhibit:FindFirstChild("Ground")
+			if anchor then
+				local prompt = anchor:FindFirstChild("ManagePrompt") or Instance.new("ProximityPrompt")
+				prompt.Name = "ManagePrompt"
+				prompt.ActionText = "Manage Exhibit ⚙️"
+				prompt.ObjectText = exhibit:GetAttribute("DisplayName") or exhibit.Name:gsub("_Workspace", "")
+				prompt.HoldDuration = 0.5
+				prompt.MaxActivationDistance = 12
+				prompt.Parent = anchor
+				
+				prompt.Triggered:Connect(function(player)
+					-- Fire a local event or signal to open the Management UI
+					local ReplicatedStorage = game:GetService("ReplicatedStorage")
+					local remote = ReplicatedStorage:FindFirstChild("OpenExhibitManage")
+					if not remote then
+						remote = Instance.new("RemoteEvent")
+						remote.Name = "OpenExhibitManage"
+						remote.Parent = ReplicatedStorage
+					end
+					remote:FireClient(player, exhibit:GetFullName())
+				end)
+			end
+			
 			-- Periodic refresh for koala count
 			task.spawn(function()
 				while true do
@@ -36,9 +60,32 @@ function ExhibitStatService.Initialize()
 end
 
 function ExhibitStatService.CreateSign(exhibit)
-	local anchor = exhibit:FindFirstChild("SignAnchor") or exhibit:FindFirstChild("Ground")
+	-- Look for the board we just placed
+	local anchor = exhibit:FindFirstChild("SignAnchor")
 	if not anchor then return end
-
+	
+	-- Add a ProximityPrompt to the board for Management
+	local prompt = anchor:FindFirstChild("ManagePrompt") or Instance.new("ProximityPrompt")
+	prompt.Name = "ManagePrompt"
+	prompt.ActionText = "Manage Exhibit ⚙️"
+	prompt.ObjectText = exhibit:GetAttribute("DisplayName") or exhibit.Name:gsub("_Workspace", "")
+	prompt.HoldDuration = 0.5
+	prompt.MaxActivationDistance = 12
+	prompt.Parent = anchor
+	
+	prompt.Triggered:Connect(function(player)
+		-- Fire a local event or signal to open the Management UI
+		local ReplicatedStorage = game:GetService("ReplicatedStorage")
+		local remote = ReplicatedStorage:FindFirstChild("OpenExhibitManage")
+		if not remote then
+			remote = Instance.new("RemoteEvent")
+			remote.Name = "OpenExhibitManage"
+			remote.Parent = ReplicatedStorage
+		end
+		remote:FireClient(player, exhibit:GetFullName())
+	end)
+	
+	-- Create BillboardGui
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "StatSign"
 	billboard.Size = UDim2.new(6, 0, 4, 0)
@@ -103,10 +150,18 @@ function ExhibitStatService.UpdateSign(exhibit)
 	end
 
 	local food = exhibit:GetAttribute("FoodLevel") or 0
+	local maxFood = exhibit:GetAttribute("MaxFoodLevel") or 100
+	local maxKoalas = exhibit:GetAttribute("MaxKoalas") or 10
 	local displayName = exhibit:GetAttribute("DisplayName") or exhibit.Name:gsub("_Workspace", "")
 
 	frame.ExhibitName.Text = displayName
-	frame.Stats.Text = string.format("🐨 Koalas: %d\n🥗 Food: %d%%", koalaCount, food)
+	
+	local foodText = string.format("%d%%", food)
+	if maxFood > 100 then
+		foodText = string.format("%d/%d", food, maxFood)
+	end
+	
+	frame.Stats.Text = string.format("🐨 Koalas: %d/%d\n🥗 Food: %s", koalaCount, maxKoalas, foodText)
 
 	-- Color change based on food
 	if food < 20 then

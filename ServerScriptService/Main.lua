@@ -34,6 +34,7 @@ local ShopService = safeRequire(ServerScriptService.Services.ShopService)
 local ExhibitStatService = safeRequire(ServerScriptService.Services.ExhibitStatService)
 local KoalaStatService = safeRequire(ServerScriptService.Services.KoalaStatService)
 local KoalaCoreManager = safeRequire(ServerScriptService.Services.KoalaCoreManager)
+local ExhibitUpgradeService = safeRequire(ServerScriptService.Services.ExhibitUpgradeService)
 local DevService = safeRequire(ServerScriptService.Services.DevService)
 
 -- New Refactored Services
@@ -95,6 +96,7 @@ safeInit(ShopService, "ShopService")
 safeInit(ExhibitStatService, "ExhibitStatService")
 safeInit(KoalaStatService, "KoalaStatService")
 safeInit(KoalaCoreManager, "KoalaCoreManager")
+safeInit(ExhibitUpgradeService, "ExhibitUpgradeService")
 safeInit(CarryService, "CarryService")
 safeInit(DevService, "DevService")
 

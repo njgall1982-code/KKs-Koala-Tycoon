@@ -234,6 +234,28 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 				end
 				return -- EXIT: Keep koala in inventory/crate
 			end
+
+			-- Capacity Check
+			local maxKoalas = dropParent:GetAttribute("MaxKoalas") or 10
+			local currentKoalas = 0
+			local CollectionService = game:GetService("CollectionService")
+			for _, child in ipairs(dropParent:GetChildren()) do
+				if child:IsA("Model") and CollectionService:HasTag(child, "KoalaNPC") then
+					currentKoalas += 1
+				end
+			end
+
+			if currentKoalas >= maxKoalas then
+				local playerGui = player:FindFirstChild("PlayerGui")
+				local tutorialUI = playerGui and playerGui:FindFirstChild("TutorialUI")
+				local statusLabel = tutorialUI and tutorialUI:FindFirstChild("Status")
+				if statusLabel then
+					statusLabel.Text = "⚠️ Exhibit Full! Upgrade capacity to add more koalas."
+					statusLabel.Visible = true
+					task.delay(5, function() statusLabel.Visible = false end)
+				end
+				return -- EXIT: Keep koala in inventory/crate
+			end
 		end
 		-- Clean Arms
 		pcall(function() setArms(player, false) end)

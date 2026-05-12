@@ -24,6 +24,21 @@ function DataStore.SaveData(player)
 		end
 	end
 
+	-- Save Exhibit States
+	data.Exhibits = {}
+	for _, exhibit in ipairs(workspace:GetChildren()) do
+		if exhibit:IsA("Folder") and exhibit.Name:find("_Workspace") then
+			data.Exhibits[exhibit.Name] = {
+				IsRepaired = exhibit:GetAttribute("IsRepaired") or false,
+				MaxKoalas = exhibit:GetAttribute("MaxKoalas") or 10,
+				MaxFoodLevel = exhibit:GetAttribute("MaxFoodLevel") or 100,
+				ExhibitLevel = exhibit:GetAttribute("ExhibitLevel") or 1,
+				FeederLevel = exhibit:GetAttribute("FeederLevel") or 1,
+				DisplayName = exhibit:GetAttribute("DisplayName") or ""
+			}
+		end
+	end
+
 	local success, err = pcall(function()
 		PlayerData:SetAsync(tostring(player.UserId), data)
 	end)
@@ -63,6 +78,20 @@ function DataStore.LoadData(player)
 				local tv = Instance.new("StringValue", ot)
 				tv.Name = toolName
 				tv.Value = toolName
+			end
+		end
+
+		-- Restore Exhibit States
+		if result.Exhibits then
+			for exhibitName, stats in pairs(result.Exhibits) do
+				local exhibit = workspace:FindFirstChild(exhibitName)
+				if exhibit then
+					for attrName, attrValue in pairs(stats) do
+						if attrValue ~= "" then
+							exhibit:SetAttribute(attrName, attrValue)
+						end
+					end
+				end
 			end
 		end
 	else

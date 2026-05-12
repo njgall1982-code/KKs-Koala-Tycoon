@@ -1,5 +1,5 @@
 local CarryService = {}
-local KoalaCoreManager = require(game:GetService("ServerScriptService").Services.KoalaCoreManager)
+-- local KoalaCoreManager = require(game:GetService("ServerScriptService").Services.KoalaCoreManager) -- Removed for Decoupling
 function CarryService.Initialize()
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local koalaAction = ReplicatedStorage:WaitForChild("KoalaAction")
@@ -16,6 +16,15 @@ function CarryService.Initialize()
 			end
 		end
 	end)
+
+	-- Handle RequestCuddle
+	local signals = game:GetService("ServerStorage"):FindFirstChild("Signals")
+	local requestCuddle = signals and signals:FindFirstChild("RequestCuddle")
+	if requestCuddle then
+		requestCuddle.Event:Connect(function(player, koala)
+			CarryService.PerformCuddle(player, koala)
+		end)
+	end
 	print("[CarryService] Initialized.")
 end
 local function setArms(player, hold)
@@ -230,25 +239,14 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 				spawnPos = Vector3.new(g.Position.X, g.Position.Y + (g.Size.Y / 2), g.Position.Z)
 			end
 		end
-		local newKoala = KoalaCoreManager.RespawnAt(targetModel, spawnPos, dropParent)
-		
-		-- 3-Second "Sticky" Anchor to prevent falling through floor
-		-- Also disable AI briefly so KoalaSystem doesn't unanchor us early
-		newKoala:SetAttribute("AI_Disabled", true)
-		for _, p in pairs(newKoala:GetDescendants()) do
-			if p:IsA("BasePart") then 
-				p.Anchored = true 
-				if p.Name == "HumanoidRootPart" then p.CanCollide = true end
-			end
+		local signals = game:GetService("ServerStorage"):FindFirstChild("Signals")
+		local requestRespawn = signals and signals:FindFirstChild("RequestRespawn")
+		if requestRespawn then
+			print("[CarryService] Firing RequestRespawn for " .. targetModel.Name)
+			requestRespawn:Fire(targetModel, spawnPos, dropParent)
+		else
+			warn("[CarryService] RequestRespawn signal not found!")
 		end
-		task.delay(3, function()
-			if newKoala and newKoala.Parent then
-				newKoala:SetAttribute("AI_Disabled", nil)
-				for _, p in pairs(newKoala:GetDescendants()) do
-					if p:IsA("BasePart") then p.Anchored = false end
-				end
-			end
-		end)
 		
 		-- Tutorial Reward Logic
 		if exhibitName == "TutorialExhibit_Workspace" and carryingName == "KK" then
@@ -267,9 +265,12 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 			
 			-- Reward only if first time
 			if hasExhibit and not hasExhibit.Value then
-				local leaderstats = player:FindFirstChild("leaderstats")
-				if leaderstats then 
-					leaderstats.Cash.Value += 500 
+				local signals = game:GetService("ServerStorage"):FindFirstChild("Signals")
+				local grantCurrency = signals and signals:FindFirstChild("GrantCurrency")
+				if grantCurrency then
+					grantCurrency:Fire(player, 500, "Cash")
+				else
+					leaderstats.Cash.Value += 500
 				end
 				hasExhibit.Value = true
 				print("Reward given and Exhibit Owned by " .. player.Name)

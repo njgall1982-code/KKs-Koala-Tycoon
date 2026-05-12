@@ -4,11 +4,11 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local ServerStorage = game:GetService("ServerStorage")
 local RunService = game:GetService("RunService")
 
--- Load Validation Service First
+-- 1. Load Validation Service First
 local ValidationService = require(ServerScriptService.Services.ValidationService)
 ValidationService.RunChecks()
 
--- Safe Loading Helper
+-- 2. Safe Loading Helper
 local function safeRequire(modulePath)
 	local success, result = pcall(function()
 		return require(modulePath)
@@ -21,26 +21,32 @@ local function safeRequire(modulePath)
 	end
 end
 
--- Load Services
--- HOT-SWAP TYCOON/QUEST SYSTEM
-local USE_SANDBOX = true
-
-local QuestService, TycoonService
-if USE_SANDBOX then
-    QuestService = safeRequire(ServerScriptService.Services.QuestService_SANDBOX)
-    TycoonService = safeRequire(ServerScriptService.Services.TycoonService_SANDBOX)
-else
-    QuestService = safeRequire(ServerScriptService.Services.QuestService)
-    TycoonService = safeRequire(ServerScriptService.Services.TycoonService)
-end
-
+-- 3. Load ALL Services
+local EconomyService = safeRequire(ServerScriptService.Services.EconomyService)
+local QuestService = safeRequire(ServerScriptService.Services.QuestService)
+local TycoonService = safeRequire(ServerScriptService.Services.TycoonService)
+local CarryService = safeRequire(ServerScriptService.Services.CarryService)
+local DataStoreModule = safeRequire(ServerScriptService.Services.DataStoreModule)
 local RevenueService = safeRequire(ServerScriptService.Services.RevenueService)
 local LeafSpawnerService = safeRequire(ServerScriptService.Services.LeafSpawnerService)
 local HungerService = safeRequire(ServerScriptService.Services.HungerService)
-
 local ShopService = safeRequire(ServerScriptService.Services.ShopService)
+local ExhibitStatService = safeRequire(ServerScriptService.Services.ExhibitStatService)
+local KoalaStatService = safeRequire(ServerScriptService.Services.KoalaStatService)
+local KoalaCoreManager = safeRequire(ServerScriptService.Services.KoalaCoreManager)
+local DevService = safeRequire(ServerScriptService.Services.DevService)
+
+-- 4. Event Bus Listeners
 local signals = ServerStorage:WaitForChild("Signals")
 
+-- Force Pickup Listener
+signals:WaitForChild("ForcePickup").Event:Connect(function(player, model)
+    if CarryService then
+        CarryService.PickUp(player, model)
+    end
+end)
+
+-- Economy Listener
 signals.RequestTransaction.OnInvoke = function(player, amount, reason)
     if not player or not player:FindFirstChild("leaderstats") then return false, "No data" end
     local cash = player.leaderstats:FindFirstChild("Cash")
@@ -52,17 +58,15 @@ signals.RequestTransaction.OnInvoke = function(player, amount, reason)
     return false, "Insufficient funds"
 end
 
+-- Tool Award Listener
 signals.AwardTool.Event:Connect(function(player, toolName, isPermanent)
     if not player then return end
     local toolTemplate = ServerStorage:FindFirstChild(toolName)
     if toolTemplate then
         toolTemplate:Clone().Parent = player.Backpack
         if isPermanent then
-            local ownedTools = player:FindFirstChild("OwnedTools")
-            if not ownedTools then
-                ownedTools = Instance.new("Folder", player)
-                ownedTools.Name = "OwnedTools"
-            end
+            local ownedTools = player:FindFirstChild("OwnedTools") or Instance.new("Folder", player)
+            ownedTools.Name = "OwnedTools"
             if not ownedTools:FindFirstChild(toolName) then
                 local toolValue = Instance.new("StringValue", ownedTools)
                 toolValue.Name = toolName
@@ -72,24 +76,7 @@ signals.AwardTool.Event:Connect(function(player, toolName, isPermanent)
     end
 end)
 
-local ExhibitStatService = safeRequire(ServerScriptService.Services.ExhibitStatService)
-local KoalaStatService = safeRequire(ServerScriptService.Services.KoalaStatService)
-local KoalaCoreManager = safeRequire(ServerScriptService.Services.KoalaCoreManager)
-local CarryService = safeRequire(ServerScriptService.Services.CarryService)
-local DevService = safeRequire(ServerScriptService.Services.DevService)
-local DataStoreModule = safeRequire(ServerScriptService.Services.DataStoreModule)
-
--- Tycoon/Quest Event Bus Listeners
-if USE_SANDBOX then
-    signals:WaitForChild("ForcePickup").Event:Connect(function(player, model)
-        if CarryService then
-            CarryService.PickUp(player, model)
-        end
-    end)
-end
-
--- Initialize Systems Safely
-
+-- 5. Initialize Systems Safely
 local function safeInit(service, name)
 	if service and service.Initialize then
 		local success, err = pcall(function() service.Initialize() end)
@@ -99,6 +86,7 @@ local function safeInit(service, name)
 	end
 end
 
+safeInit(EconomyService, "EconomyService")
 safeInit(TycoonService, "TycoonService")
 safeInit(QuestService, "QuestService")
 safeInit(RevenueService, "RevenueService")
@@ -111,8 +99,9 @@ safeInit(KoalaCoreManager, "KoalaCoreManager")
 safeInit(CarryService, "CarryService")
 safeInit(DevService, "DevService")
 
-print("[Main] 🚀 STARTING SIMPLIFIED TYCOON LOOP")
+print("[Main] 🚀 ALL SYSTEMS INITIALIZED")
 
+-- 6. Player Lifecycle
 local function onPlayerAdded(player)
 	print("[Main] 👤 PlayerAdded: " .. player.Name)
 
@@ -130,9 +119,13 @@ local function onPlayerAdded(player)
 			end
 		end
 
+		-- Apply Run Speed
+		local humanoid = character:WaitForChild("Humanoid")
+		humanoid.WalkSpeed = 24
+
 		-- Wait for DataLoaded to apply world state
 		task.spawn(function()
-			local timeout = 10
+			local timeout = 5
 			local start = tick()
 			while not player:GetAttribute("DataLoaded") and (tick() - start) < timeout do
 				task.wait(0.2)
@@ -141,13 +134,9 @@ local function onPlayerAdded(player)
 			if TycoonService then
 				TycoonService.InitializePlayer(player)
 			end
-			if QuestService then
-				if USE_SANDBOX then
-					signals:WaitForChild("UpdateQuest"):Fire(player, "👋 Welcome! Repair Exhibit 1 🔨 then talk to the Head Vet 👨‍⚕️")
-				else
-					QuestService.UpdateQuest(player, "👋 Welcome! Repair Exhibit 1 🔨 then talk to the Head Vet 👨‍⚕️")
-				end
-			end
+			
+			-- Send Welcome Message
+			signals.UpdateQuest:Fire(player, "👋 Welcome! Repair Exhibit 1 🔨 then talk to the Head Vet 👨‍⚕️")
 		end)
 	end)
 end
@@ -169,7 +158,7 @@ game:BindToClose(function()
 			DataStoreModule.SaveData(player)
 		end
 	end
-	task.wait(2)
+	task.wait(1)
 end)
 
-print("[Main] Tycoon Services Initialized")
+print("[Main] 🚀 TYCOON ONLINE")

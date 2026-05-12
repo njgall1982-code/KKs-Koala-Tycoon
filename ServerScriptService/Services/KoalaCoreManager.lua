@@ -221,6 +221,7 @@ function KoalaCoreManager.InitKoala(koala, rarityName, startAge)
 	koala:SetAttribute("StageName", stageData.name)
 	koala:SetAttribute("Stage", stageData.stage)
 	koala:SetAttribute("Rarity", rarityVal.Value)
+	koala:SetAttribute("RevenueMultiplier", KoalaCoreManager.GetRevenueMultiplier(koala))
 
 	-- Apply rarity aura
 	KoalaCoreManager.ApplyRarityAura(koala, rarityVal.Value)
@@ -301,10 +302,11 @@ function KoalaCoreManager.SwapModel(oldKoala, newStageName)
 end
 
 function KoalaCoreManager.RespawnAt(oldKoala, pos, parent)
+	print("[KoalaCoreManager] RespawnAt triggered for " .. (oldKoala and oldKoala.Name or "nil"))
 	local oldStats   = oldKoala:FindFirstChild("KoalaStats")
 	local oldAge     = oldStats and oldStats.Age.Value or 0
 	local oldRarity  = oldStats and oldStats.Rarity.Value or "Cute"
-	local oldStage   = oldStats and oldStats.Stage.Value or 1
+	local oldStage   = oldStats and oldStats.Stage.Value or (oldKoala.Name == "KK" and 4 or 1)
 	local oldName    = oldKoala:GetAttribute("DisplayName") or oldKoala.Name
 	local hasNamed   = oldKoala:GetAttribute("HasBeenNamed") or false
 	local homeExhibit = parent and parent.Name or oldKoala:GetAttribute("HomeExhibit")
@@ -340,6 +342,23 @@ function KoalaCoreManager.RespawnAt(oldKoala, pos, parent)
 
 	-- Init stats
 	KoalaCoreManager.InitKoala(newKoala, oldRarity, oldAge)
+
+	-- 3-Second "Sticky" Anchor to prevent falling through floor
+	newKoala:SetAttribute("AI_Disabled", true)
+	for _, p in pairs(newKoala:GetDescendants()) do
+		if p:IsA("BasePart") then 
+			p.Anchored = true 
+			if p.Name == "HumanoidRootPart" then p.CanCollide = true end
+		end
+	end
+	task.delay(3, function()
+		if newKoala and newKoala.Parent then
+			newKoala:SetAttribute("AI_Disabled", nil)
+			for _, p in pairs(newKoala:GetDescendants()) do
+				if p:IsA("BasePart") then p.Anchored = false end
+			end
+		end
+	end)
 
 	-- Cleanup old
 	oldKoala:Destroy()
@@ -444,15 +463,18 @@ function KoalaCoreManager.Initialize()
 			if stats and stats:FindFirstChild("LastCuddleTime") then
 				stats.LastCuddleTime.Value = os.time()
 				print("[KoalaCoreManager] " .. player.Name .. " cuddled " .. targetKoala.Name)
-				
+
 				-- Show Heart Emoji Effect
 				KoalaCoreManager.ShowHeartEffect(targetKoala)
-				
-				-- Start physical cuddle interaction
-				local CarryService = require(game:GetService("ServerScriptService").Services.CarryService)
-				task.spawn(function()
-					CarryService.PerformCuddle(player, targetKoala)
-				end)
+
+				-- Start physical cuddle interaction via signal
+				local signals = game:GetService("ServerStorage"):FindFirstChild("Signals")
+				local requestCuddle = signals and signals:FindFirstChild("RequestCuddle")
+				if requestCuddle then
+					requestCuddle:Fire(player, targetKoala)
+				else
+					warn("[KoalaCoreManager] RequestCuddle signal not found!")
+				end
 			end
 		elseif action == "Follow" then
 			-- Clear any existing follower for this player
@@ -478,6 +500,15 @@ function KoalaCoreManager.Initialize()
 		-- KK and other legacy koalas default to Adult (Cute)
 		KoalaCoreManager.InitKoala(koala, "Cute", 3600)
 	end)
+
+	-- Handle RequestRespawn
+	local signalsFolder = ServerStorage:WaitForChild("Signals")
+	local requestRespawn = signalsFolder:FindFirstChild("RequestRespawn")
+	if requestRespawn then
+		requestRespawn.Event:Connect(function(oldKoala, pos, parent)
+			KoalaCoreManager.RespawnAt(oldKoala, pos, parent)
+		end)
+	end
 
 	print("[KoalaCoreManager] Initialized. Growth tick every " .. GROWTH_TICK_INTERVAL .. "s.")
 end
@@ -561,6 +592,7 @@ function KoalaCoreManager.RefreshGrowth(koala)
 	koala:SetAttribute("MaxAge", stageData.maxAge)
 	koala:SetAttribute("StageName", stageData.name)
 	koala:SetAttribute("Stage", stageData.stage)
+	koala:SetAttribute("RevenueMultiplier", KoalaCoreManager.GetRevenueMultiplier(koala))
 
 	-- Check for growth
 	if stageData.stage > currentStage then

@@ -8,6 +8,11 @@ local CollectionService = game:GetService("CollectionService")
 local signals = ServerStorage:WaitForChild("Signals")
 local updateQuestSignal = signals:WaitForChild("UpdateQuest")
 local forcePickupSignal = signals:WaitForChild("ForcePickup")
+local showStatusSignal = signals:WaitForChild("ShowStatus")
+
+showStatusSignal.Event:Connect(function(player, message)
+	TycoonService.UpdateStatus(player, message)
+end)
 
 local playerRepairs = {}
 
@@ -215,6 +220,12 @@ function TycoonService.HandleVetInteraction(player)
 		forcePickupSignal:Fire(player, kk)
 
 		TycoonService.UpdateStatus(player, "👨‍⚕️ Vet: Carry KK to the exhibit. Click KK and use 'Place' to put him home.")
+
+		-- Reward for completing the repair quest
+		local grantCurrency = signals:FindFirstChild("GrantCurrency")
+		if grantCurrency then
+			grantCurrency:Fire(player, 100, "Cash")
+		end
 
 		-- EVENT BUS: Update Quest
 		updateQuestSignal:Fire(player, "🏠 Carry KK to his Exhibit. Click him and use the 'Place' button.")

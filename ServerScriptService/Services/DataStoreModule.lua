@@ -6,12 +6,36 @@ local PlayerData = DataStoreService:GetDataStore("KKsKoalaTycoonData_v1")
 local DataStore = {}
 
 function DataStore.SaveData(player)
-	print("[DataStore] ⚠️ Persistence DISABLED - Skipping Save for " .. player.Name)
-	return
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if not leaderstats then return end
+	
+	local data = {
+		Cash = leaderstats.Cash.Value,
+		Conservation = leaderstats.Conservation.Value,
+		HasExhibit = player:FindFirstChild("HasExhibit") and player.HasExhibit.Value or false,
+		LeafCount = player:GetAttribute("LeafCount") or 0,
+		OwnedTools = {}
+	}
+	
+	local ownedTools = player:FindFirstChild("OwnedTools")
+	if ownedTools then
+		for _, tool in ipairs(ownedTools:GetChildren()) do
+			table.insert(data.OwnedTools, tool.Name)
+		end
+	end
+
+	local success, err = pcall(function()
+		PlayerData:SetAsync(tostring(player.UserId), data)
+	end)
+	
+	if success then
+		print("[DataStore] ✅ Saved data for " .. player.Name)
+	else
+		warn("[DataStore] ❌ Failed to save data for " .. player.Name .. ": " .. tostring(err))
+	end
 end
 
 function DataStore.LoadData(player)
-	print("[DataStore] ⚠️ Persistence DISABLED - Initializing Default State for " .. player.Name)
 	local leaderstats = player:FindFirstChild("leaderstats") or Instance.new("Folder", player)
 	leaderstats.Name = "leaderstats"
 	local cash = leaderstats:FindFirstChild("Cash") or Instance.new("IntValue", leaderstats)
@@ -23,11 +47,31 @@ function DataStore.LoadData(player)
 	local ot = player:FindFirstChild("OwnedTools") or Instance.new("Folder", player)
 	ot.Name = "OwnedTools"
 	
-	-- DEFAULT VALUES
-	cash.Value = 0
-	cons.Value = 0
-	he.Value = false
-	player:SetAttribute("LeafCount", 0)
+	local success, result = pcall(function()
+		return PlayerData:GetAsync(tostring(player.UserId))
+	end)
+	
+	if success and result then
+		print("[DataStore] 💾 Loaded existing data for " .. player.Name)
+		cash.Value = result.Cash or 0
+		cons.Value = result.Conservation or 0
+		he.Value = result.HasExhibit or false
+		player:SetAttribute("LeafCount", result.LeafCount or 0)
+		
+		if result.OwnedTools then
+			for _, toolName in ipairs(result.OwnedTools) do
+				local tv = Instance.new("StringValue", ot)
+				tv.Name = toolName
+				tv.Value = toolName
+			end
+		end
+	else
+		print("[DataStore] ✨ Initializing Default State for " .. player.Name)
+		cash.Value = 0
+		cons.Value = 0
+		he.Value = false
+		player:SetAttribute("LeafCount", 0)
+	end
 	
 	player:SetAttribute("DataLoaded", true)
 end

@@ -22,9 +22,12 @@ function LeafSpawnerService.Initialize()
 			local current = player:GetAttribute("LeafCount") or 0
 			player:SetAttribute("LeafCount", current + 1)
 			
-			-- Visual feedback
-			local TycoonService = require(game:GetService("ServerScriptService").Services.TycoonService)
-			TycoonService.UpdateStatus(player, "🌿 Collected Eucalyptus Leaf (" .. (current + 1) .. ")")
+			-- Visual feedback via signal
+			local signals = game:GetService("ServerStorage"):FindFirstChild("Signals")
+			local showStatus = signals and signals:FindFirstChild("ShowStatus")
+			if showStatus then
+				showStatus:Fire(player, "🌿 Collected Eucalyptus Leaf (" .. (current + 1) .. ")")
+			end
 			
 			leaf:Destroy()
 		end)

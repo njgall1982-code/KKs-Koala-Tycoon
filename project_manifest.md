@@ -31,10 +31,15 @@ PRIMARY: We copied the scripts to this folder. We need to keep these in sync.
 - **The Rule**: Starving Koalas don't pay rent. If `FoodLevel` is 0, the exhibit generates $0 income.
 - **Refill**: 1 Leaf = 20% Food. Max capacity is 5 (Default) or 20 (Leaf Bag).
 
-#### 6. Exhibit Stat Signs (Info Boards)
-- **Standard**: Every exhibit folder must have a part named `SignAnchor`.
-- **System**: `ExhibitStatService` attaches a Glassmorphism BillboardGui to this part.
-- **Naming**: Players can rename exhibits via the `RenamePrompt` on the board (Server-side safety filtered).
+#### 7. Decoupled "Event-Bus" Architecture
+- **The Rule**: **No-Require**. Game logic `ModuleScripts` must NOT require other logic modules directly.
+- **The System**: Use `ServerStorage.Signals` (BindableEvents/Functions) for all cross-system communication.
+- **Benefits**: This ensures "Feature Isolation." If the Shop system crashes, the Quest system keeps running because it only cares about signals, not direct memory pointers.
+- **Standard Signals**: 
+    - `RequestTransaction`: Safely handles currency via the Economy layer.
+    - `AwardTool`: Decoupled item granting.
+    - `UpdateQuest`: Decoupled UI updates.
+    - `ForcePickup`: Decoupled interaction/carry logic.
 
 ### 🎨 Visual & Aesthetic Standards
 *   **World Theme**: Lush park/zoo. Baseplate is always `Material.Grass` (Parsley Green).

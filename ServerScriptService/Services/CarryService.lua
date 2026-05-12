@@ -241,13 +241,15 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 			local hasExhibit = player:FindFirstChild("HasExhibit")
 			
 			-- Always fire quest update and clear it, to prevent stuck UI
-			local QuestService = require(game:GetService("ServerScriptService").Services.QuestService)
-			QuestService.UpdateQuest(player, "🎉 KK is Home! You completed the first rescue!")
-			
-			-- Clear quest after 8 seconds (longer for first one)
-			task.delay(8, function()
-				QuestService.UpdateQuest(player, "")
-			end)
+			local signals = game:GetService("ServerStorage"):FindFirstChild("Signals")
+			if signals and signals:FindFirstChild("UpdateQuest") then
+				signals.UpdateQuest:Fire(player, "🎉 KK is Home! You completed the first rescue!")
+				
+				-- Clear quest after 8 seconds (longer for first one)
+				task.delay(8, function()
+					signals.UpdateQuest:Fire(player, "")
+				end)
+			end
 			
 			-- Reward only if first time
 			if hasExhibit and not hasExhibit.Value then

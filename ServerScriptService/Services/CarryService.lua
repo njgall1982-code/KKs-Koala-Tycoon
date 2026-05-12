@@ -212,9 +212,23 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 		local spawnPos = dropCFrame.Position
 		if dropParent and dropParent:FindFirstChild("Ground") then
 			local g = dropParent.Ground
-			-- Spawn above terrain level to account for model offset
-			-- Koala model has HRP offset that causes floating
-			spawnPos = Vector3.new(g.Position.X, 5.5, g.Position.Z)
+			
+			-- Raycast to find the true terrain/surface height
+			local rayOrigin = Vector3.new(g.Position.X, g.Position.Y + 50, g.Position.Z)
+			local rayDirection = Vector3.new(0, -100, 0)
+			
+			local rayParams = RaycastParams.new()
+			-- Exclude the dropping player and the carried model
+			rayParams.FilterDescendantsInstances = {player.Character, targetModel}
+			rayParams.FilterType = Enum.RaycastFilterType.Exclude
+			
+			local result = workspace:Raycast(rayOrigin, rayDirection, rayParams)
+			if result then
+				spawnPos = result.Position
+			else
+				-- Fallback if raycast fails
+				spawnPos = Vector3.new(g.Position.X, g.Position.Y + (g.Size.Y / 2), g.Position.Z)
+			end
 		end
 		local newKoala = KoalaCoreManager.RespawnAt(targetModel, spawnPos, dropParent)
 		

@@ -89,6 +89,7 @@ if USE_SANDBOX then
 end
 
 -- Initialize Systems Safely
+
 local function safeInit(service, name)
 	if service and service.Initialize then
 		local success, err = pcall(function() service.Initialize() end)

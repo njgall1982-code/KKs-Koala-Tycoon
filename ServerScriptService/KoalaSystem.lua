@@ -335,15 +335,8 @@ local function updateWander(state, dt)
 				state.isClimbing = true
 				state.climbTarget = tree
 				state.climbPhase = "approaching"
-				-- Set originalY to ground level if available
-				local homePath = state.koala:GetAttribute("HomeExhibit")
-				local exhibit = homePath and workspace:FindFirstChild(homePath)
-				local ground = exhibit and exhibit:FindFirstChild("Ground")
-				if ground then
-					state.originalY = ground.Position.Y + (ground.Size.Y / 2)
-				else
-					state.originalY = state.hrp.Position.Y
-				end
+				-- Set originalY to current ground level
+				state.originalY = state.hrp.Position.Y
 				-- Target the trunk part if it exists
 				local trunk = tree:FindFirstChild("Trunk") or tree
 				state.treePos = trunk:GetPivot().Position

@@ -7,13 +7,13 @@ local openShopEvent = ReplicatedStorage:WaitForChild("OpenShopEvent")
 local purchaseEvent = ReplicatedStorage:WaitForChild("PurchaseToolEvent")
 
 local signals = ServerStorage:WaitForChild("Signals")
-local requestTransaction = signals:WaitForChild("RequestTransaction")
+local transactionRequest = signals:WaitForChild("TransactionRequest")
 local awardTool = signals:WaitForChild("AwardTool")
 
 local connections = {} -- toolShed -> connection
 
 local TOOL_PRICES = {
-    Shovel = 150,
+    ["Garden Shovel"] = 150,
     RenameTag = 150,
     MilkBottle = 50,
 }
@@ -105,7 +105,7 @@ function ShopService.HandlePurchaseRequest(player, toolName, price)
     end
 
     -- Decoupled Transaction Request
-    local success, reason = requestTransaction:Invoke(player, expectedPrice, "Purchase_" .. toolName)
+    local success, reason = transactionRequest:Invoke(player, expectedPrice, "Purchase_" .. toolName)
     
     if success then
         awardTool:Fire(player, toolName, not consumable)

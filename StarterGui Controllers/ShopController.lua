@@ -98,7 +98,3 @@ end)
 
 -- Listen for open shop requests from server
 openShopEvent.OnClientEvent:Connect(openShop)
-
--- Expose openShop function globally for proximity prompts
-_G.OpenToolShop = openShop
-_G.CloseToolShop = closeShop

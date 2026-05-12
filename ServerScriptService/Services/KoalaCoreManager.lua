@@ -338,7 +338,10 @@ function KoalaCoreManager.RespawnAt(oldKoala, pos, parent)
 	newKoala:PivotTo(CFrame.new(pos + Vector3.new(0, hrpHeight, 0)))
 	
 	-- Parent to exhibit after positioning
-	if parent then newKoala.Parent = parent end
+	if parent then 
+		newKoala.Parent = parent 
+		newKoala:SetAttribute("HomeExhibit", parent.Name)
+	end
 
 	-- Init stats
 	KoalaCoreManager.InitKoala(newKoala, oldRarity, oldAge)
@@ -469,11 +472,11 @@ function KoalaCoreManager.Initialize()
 
 				-- Start physical cuddle interaction via signal
 				local signals = game:GetService("ServerStorage"):FindFirstChild("Signals")
-				local requestCuddle = signals and signals:FindFirstChild("RequestCuddle")
-				if requestCuddle then
-					requestCuddle:Fire(player, targetKoala)
+				local cuddleRequest = signals and signals:FindFirstChild("CuddleRequest")
+				if cuddleRequest then
+					cuddleRequest:Fire(player, targetKoala)
 				else
-					warn("[KoalaCoreManager] RequestCuddle signal not found!")
+					warn("[KoalaCoreManager] CuddleRequest signal not found!")
 				end
 			end
 		elseif action == "Follow" then
@@ -501,12 +504,20 @@ function KoalaCoreManager.Initialize()
 		KoalaCoreManager.InitKoala(koala, "Cute", 3600)
 	end)
 
-	-- Handle RequestRespawn
+	-- Handle RespawnRequest
 	local signalsFolder = ServerStorage:WaitForChild("Signals")
-	local requestRespawn = signalsFolder:FindFirstChild("RequestRespawn")
-	if requestRespawn then
-		requestRespawn.Event:Connect(function(oldKoala, pos, parent)
+	local respawnRequest = signalsFolder:FindFirstChild("RespawnRequest")
+	if respawnRequest then
+		respawnRequest.Event:Connect(function(oldKoala, pos, parent)
 			KoalaCoreManager.RespawnAt(oldKoala, pos, parent)
+		end)
+	end
+
+	-- Listen for SleepyEffect requests (No-Require pattern)
+	local sleepySignal = signalsFolder:FindFirstChild("SleepyEffect")
+	if sleepySignal then
+		sleepySignal.Event:Connect(function(koala)
+			KoalaCoreManager.ShowSleepyEffect(koala)
 		end)
 	end
 

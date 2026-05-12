@@ -17,11 +17,11 @@ function CarryService.Initialize()
 		end
 	end)
 
-	-- Handle RequestCuddle
+	-- Handle CuddleRequest
 	local signals = game:GetService("ServerStorage"):FindFirstChild("Signals")
-	local requestCuddle = signals and signals:FindFirstChild("RequestCuddle")
-	if requestCuddle then
-		requestCuddle.Event:Connect(function(player, koala)
+	local cuddleRequest = signals and signals:FindFirstChild("CuddleRequest")
+	if cuddleRequest then
+		cuddleRequest.Event:Connect(function(player, koala)
 			CarryService.PerformCuddle(player, koala)
 		end)
 	end
@@ -88,7 +88,11 @@ function CarryService.PickUp(player, targetModel, weldTarget, isCuddle)
 	
 	-- Position target
 	if weldTarget then
-		targetModel:PivotTo(weldTarget.CFrame)
+		if weldTarget:IsA("Attachment") then
+			targetModel:PivotTo(weldTarget.WorldCFrame)
+		else
+			targetModel:PivotTo(weldTarget.CFrame)
+		end
 	elseif isCuddle then
 		-- Centered "Hug" Position
 		targetModel:PivotTo(rootPart.CFrame * CFrame.new(0, -0.2, -0.7) * CFrame.Angles(0, math.rad(180), 0))
@@ -108,9 +112,10 @@ function CarryService.PickUp(player, targetModel, weldTarget, isCuddle)
 			p.Transparency = 0
 			if p.Name == "HumanoidRootPart" then p.Transparency = 1 end
 			
-			-- If in a crate, maybe hide or shrink (optional visual flavor)
+			-- If in a crate, ensure visible
 			if weldTarget then
-				-- p.Transparency = 1
+				p.Transparency = 0
+				if p.Name == "HumanoidRootPart" then p.Transparency = 1 end
 				if p.Name == "SelectionBox" then p:Destroy() end
 			end
 		elseif p:IsA("Decal") or p:IsA("Texture") then
@@ -123,9 +128,21 @@ function CarryService.PickUp(player, targetModel, weldTarget, isCuddle)
 	-- Create Weld
 	local weld = Instance.new("WeldConstraint")
 	weld.Name = "CarryWeld"
-	weld.Part0 = weldTarget or rootPart
+	
+	-- Determine weld parent (must be a BasePart)
+	local part0 = weldTarget
+	if weldTarget and weldTarget:IsA("Attachment") then
+		part0 = weldTarget.Parent
+	end
+	
+	weld.Part0 = part0 or rootPart
 	weld.Part1 = targetRoot
 	weld.Parent = targetRoot
+	
+	-- Parent to the weld target to ensure it follows into Backpack/ServerStorage
+	if part0 then
+		targetModel.Parent = part0.Parent
+	end
 	
 	-- Disable target physics
 	local targetHum = targetModel:FindFirstChild("Humanoid")
@@ -172,13 +189,18 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 	local carryingName = player:GetAttribute("Carrying")
 	if not carryingName then return end
 	
-	-- Find the carried model in the workspace by checking attribute
+	-- Find the carried model in the player or workspace
+	local searchContainers = {character, player.Backpack, workspace}
 	local targetModel = nil
-	for _, m in pairs(workspace:GetDescendants()) do
-		if m:IsA("Model") and m.Name == carryingName and m:GetAttribute("IsBeingCarried") then
-			targetModel = m
-			break
+	
+	for _, container in ipairs(searchContainers) do
+		for _, m in pairs(container:GetDescendants()) do
+			if m:IsA("Model") and m.Name == carryingName and m:GetAttribute("IsBeingCarried") then
+				targetModel = m
+				break
+			end
 		end
+		if targetModel then break end
 	end
 	
 	if targetModel then
@@ -240,12 +262,11 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 			end
 		end
 		local signals = game:GetService("ServerStorage"):FindFirstChild("Signals")
-		local requestRespawn = signals and signals:FindFirstChild("RequestRespawn")
-		if requestRespawn then
-			print("[CarryService] Firing RequestRespawn for " .. targetModel.Name)
-			requestRespawn:Fire(targetModel, spawnPos, dropParent)
+		local respawnRequest = signals and signals:FindFirstChild("RespawnRequest")
+		if respawnRequest then
+			respawnRequest:Fire(targetModel, spawnPos, dropParent)
 		else
-			warn("[CarryService] RequestRespawn signal not found!")
+			warn("[CarryService] RespawnRequest signal not found!")
 		end
 		
 		-- Tutorial Reward Logic

@@ -36,44 +36,42 @@ local KoalaStatService = safeRequire(ServerScriptService.Services.KoalaStatServi
 local KoalaCoreManager = safeRequire(ServerScriptService.Services.KoalaCoreManager)
 local DevService = safeRequire(ServerScriptService.Services.DevService)
 
+-- New Refactored Services
+local KoalaSystem = safeRequire(ServerScriptService.Services.KoalaSystem)
+local TeleportToForest = safeRequire(ServerScriptService.Services.TeleportToForest)
+
 -- 4. Event Bus Listeners
 local signals = ServerStorage:WaitForChild("Signals")
 
 -- Force Pickup Listener
 signals:WaitForChild("ForcePickup").Event:Connect(function(player, model)
-    if CarryService then
-        CarryService.PickUp(player, model)
-    end
+	if CarryService then
+		CarryService.PickUp(player, model)
+	end
 end)
-
--- Economy Listener
-signals.RequestTransaction.OnInvoke = function(player, amount, reason)
-    if not player or not player:FindFirstChild("leaderstats") then return false, "No data" end
-    local cash = player.leaderstats:FindFirstChild("Cash")
-    if cash and cash.Value >= amount then
-        cash.Value -= amount
-        print("[EconomyBus] Processed " .. reason .. " for " .. player.Name .. ": -$" .. amount)
-        return true
-    end
-    return false, "Insufficient funds"
-end
 
 -- Tool Award Listener
 signals.AwardTool.Event:Connect(function(player, toolName, isPermanent)
-    if not player then return end
-    local toolTemplate = ServerStorage:FindFirstChild(toolName)
-    if toolTemplate then
-        toolTemplate:Clone().Parent = player.Backpack
-        if isPermanent then
-            local ownedTools = player:FindFirstChild("OwnedTools") or Instance.new("Folder", player)
-            ownedTools.Name = "OwnedTools"
-            if not ownedTools:FindFirstChild(toolName) then
-                local toolValue = Instance.new("StringValue", ownedTools)
-                toolValue.Name = toolName
-                toolValue.Value = toolName
-            end
-        end
-    end
+	if not player then return end
+	local toolTemplate = ServerStorage:FindFirstChild(toolName)
+	if toolTemplate then
+		toolTemplate:Clone().Parent = player.Backpack
+		if isPermanent then
+			-- Add to StarterGear so it persists through death
+			local starterGear = player:FindFirstChild("StarterGear")
+			if starterGear and not starterGear:FindFirstChild(toolName) then
+				toolTemplate:Clone().Parent = starterGear
+			end
+
+			local ownedTools = player:FindFirstChild("OwnedTools") or Instance.new("Folder", player)
+			ownedTools.Name = "OwnedTools"
+			if not ownedTools:FindFirstChild(toolName) then
+				local toolValue = Instance.new("StringValue", ownedTools)
+				toolValue.Name = toolName
+				toolValue.Value = toolName
+			end
+		end
+	end
 end)
 
 -- 5. Initialize Systems Safely
@@ -87,6 +85,7 @@ local function safeInit(service, name)
 end
 
 safeInit(EconomyService, "EconomyService")
+
 safeInit(TycoonService, "TycoonService")
 safeInit(QuestService, "QuestService")
 safeInit(RevenueService, "RevenueService")
@@ -98,6 +97,10 @@ safeInit(KoalaStatService, "KoalaStatService")
 safeInit(KoalaCoreManager, "KoalaCoreManager")
 safeInit(CarryService, "CarryService")
 safeInit(DevService, "DevService")
+
+-- New Services
+safeInit(KoalaSystem, "KoalaSystem")
+safeInit(TeleportToForest, "TeleportToForest")
 
 print("[Main] 🚀 ALL SYSTEMS INITIALIZED")
 
@@ -123,7 +126,7 @@ local function onPlayerAdded(player)
 		local humanoid = character:WaitForChild("Humanoid")
 		humanoid.WalkSpeed = 24
 
-		-- Wait for DataLoaded to apply world state
+		-- Wait for DataLoaded to apply world state and tools
 		task.spawn(function()
 			local timeout = 5
 			local start = tick()
@@ -131,10 +134,31 @@ local function onPlayerAdded(player)
 				task.wait(0.2)
 			end
 
+			-- Sync Owned Tools to Backpack/StarterGear
+			local ownedTools = player:FindFirstChild("OwnedTools")
+			if ownedTools then
+				for _, tVal in ipairs(ownedTools:GetChildren()) do
+					local toolName = tVal.Name
+					-- Legacy Mapping
+					if toolName == "Shovel" then toolName = "Garden Shovel" end
+
+					local toolTemplate = ServerStorage:FindFirstChild(toolName)
+					if toolTemplate then
+						if not player.Backpack:FindFirstChild(tVal.Name) and not character:FindFirstChild(tVal.Name) then
+							toolTemplate:Clone().Parent = player.Backpack
+						end
+						local starterGear = player:FindFirstChild("StarterGear")
+						if starterGear and not starterGear:FindFirstChild(tVal.Name) then
+							toolTemplate:Clone().Parent = starterGear
+						end
+					end
+				end
+			end
+
 			if TycoonService then
 				TycoonService.InitializePlayer(player)
 			end
-			
+
 			-- Send Welcome Message
 			signals.UpdateQuest:Fire(player, "👋 Welcome! Repair Exhibit 1 🔨 then talk to the Head Vet 👨‍⚕️")
 		end)

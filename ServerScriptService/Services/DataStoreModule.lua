@@ -39,6 +39,28 @@ function DataStore.SaveData(player)
 		end
 	end
 
+	-- Save Koalas
+	data.Koalas = {}
+	local CollectionService = game:GetService("CollectionService")
+	local koalas = CollectionService:GetTagged("KoalaNPC")
+	print("[DataStore] 🐨 Checking " .. #koalas .. " koalas for saving...")
+	
+	for _, koala in ipairs(koalas) do
+		local stats = koala:FindFirstChild("KoalaStats")
+		local home = koala:GetAttribute("HomeExhibit")
+		
+		if stats then
+			print("[DataStore] ✅ Saving Koala: " .. (koala:GetAttribute("DisplayName") or "Unknown") .. " | Home: " .. tostring(home))
+			table.insert(data.Koalas, {
+				Name = koala.Name,
+				DisplayName = koala:GetAttribute("DisplayName") or koala.Name,
+				Rarity = stats:FindFirstChild("Rarity") and stats.Rarity.Value or "Cute",
+				Age = stats:FindFirstChild("Age") and stats.Age.Value or 0,
+				HomeExhibit = home or ""
+			})
+		end
+	end
+
 	local success, err = pcall(function()
 		PlayerData:SetAsync(tostring(player.UserId), data)
 	end)
@@ -67,7 +89,7 @@ function DataStore.LoadData(player)
 	end)
 	
 	if success and result then
-		print("[DataStore] 💾 Loaded existing data for " .. player.Name)
+		print(string.format("[DataStore] 💾 Loaded data for %s: Cash: %d, Cons: %d", player.Name, result.Cash or 0, result.Conservation or 0))
 		cash.Value = result.Cash or 0
 		cons.Value = result.Conservation or 0
 		he.Value = result.HasExhibit or false
@@ -94,6 +116,69 @@ function DataStore.LoadData(player)
 				end
 			end
 		end
+		-- Restore Koalas
+		if result.Koalas and #result.Koalas > 0 then
+			print("[DataStore] 🐨 Attempting to restore " .. #result.Koalas .. " koalas...")
+			local KoalaCoreManager = require(game:GetService("ServerScriptService").Services.KoalaCoreManager)
+			task.spawn(function()
+				task.wait(2) -- Extra delay for world stability
+				for _, kData in ipairs(result.Koalas) do
+					if not kData.HomeExhibit or kData.HomeExhibit == "" then 
+						print("[DataStore] ⚠️ Skipping koala " .. kData.DisplayName .. " - No HomeExhibit saved.")
+						continue 
+					end
+					
+					local exhibit = workspace:FindFirstChild(kData.HomeExhibit)
+					if exhibit then
+						print("[DataStore] 🏗️ Respawning " .. kData.DisplayName .. " in " .. kData.HomeExhibit)
+						-- Create a temporary dummy to pass to RespawnAt
+						local dummy = Instance.new("Model")
+						dummy.Name = kData.Name
+						dummy:SetAttribute("DisplayName", kData.DisplayName)
+						
+						local stats = Instance.new("Folder", dummy)
+						stats.Name = "KoalaStats"
+						
+						local age = Instance.new("NumberValue", stats)
+						age.Name = "Age"
+						age.Value = kData.Age
+						
+						local rarity = Instance.new("StringValue", stats)
+						rarity.Name = "Rarity"
+						rarity.Value = kData.Rarity
+						
+						-- Help RespawnAt determine the correct stage
+						local stage = Instance.new("IntValue", stats)
+						stage.Name = "Stage"
+						if kData.Name == "KK" or kData.Age >= 3600 then
+							stage.Value = 4
+						elseif kData.Age >= 2400 then
+							stage.Value = 3
+						elseif kData.Age >= 1200 then
+							stage.Value = 2
+						else
+							stage.Value = 1
+						end
+						
+						-- Use RespawnAt with a random scatter to avoid stacking
+						local ground = exhibit:FindFirstChild("Ground") or exhibit:FindFirstChildOfClass("BasePart")
+						local basePos = ground and ground.Position or Vector3.new(0, 5, 0)
+						local scatter = 8 -- Studs of scatter
+						local spawnPos = basePos + Vector3.new(
+							math.random(-scatter, scatter),
+							2, -- Spawn slightly above ground
+							math.random(-scatter, scatter)
+						)
+						
+						KoalaCoreManager.RespawnAt(dummy, spawnPos, exhibit)
+					else
+						print("[DataStore] ❌ Could not find exhibit: " .. kData.HomeExhibit .. " for koala " .. kData.DisplayName)
+					end
+				end
+			end)
+		else
+			print("[DataStore] 🐨 No koalas found in save data.")
+		end
 	else
 		print("[DataStore] ✨ Initializing Default State for " .. player.Name)
 		cash.Value = 0
@@ -104,4 +189,13 @@ function DataStore.LoadData(player)
 	
 	player:SetAttribute("DataLoaded", true)
 end
+
+-- Safety net for Studio/Server Shutdown
+game:BindToClose(function()
+	for _, player in ipairs(Players:GetPlayers()) do
+		DataStore.SaveData(player)
+	end
+	task.wait(2) -- Give time for async calls
+end)
+
 return DataStore

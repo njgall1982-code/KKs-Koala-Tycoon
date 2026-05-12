@@ -65,14 +65,8 @@ local function createWheelUI()
 						inspectRequest:FireServer(currentKoala)
 					end
 				elseif action == "Rename" then
-					-- Directly trigger the rename logic by simulating an inspect return
-					local inspectRemote = ReplicatedStorage:FindFirstChild("InspectKoala")
-					if inspectRemote then
-						-- This is a bit hacky but works: manually trigger the inspect UI 
-						-- which contains the rename button
-						local inspectRequest = ReplicatedStorage:FindFirstChild("InspectRequest")
-						if inspectRequest then inspectRequest:FireServer(currentKoala) end
-					end
+					local inspectRequest = ReplicatedStorage:FindFirstChild("InspectRequest")
+					if inspectRequest then inspectRequest:FireServer(currentKoala) end
 				else
 					local actionToFire = btn:GetAttribute("CurrentAction") or action
 					koalaAction:FireServer(actionToFire, currentKoala)
@@ -113,7 +107,6 @@ highlight.OutlineTransparency = 0.5
 highlight.Enabled = false
 highlight.Parent = player:WaitForChild("PlayerGui")
 
--- Rarity Glow Preservation
 local modifiedGlow = nil
 local originalGlowData = {}
 
@@ -134,7 +127,6 @@ local function applyHoverHighlight(koala)
 
 	local glow = koala:FindFirstChild("GlowHighlight", true)
 	if glow then
-		-- Use existing rarity glow but highlight its outline
 		if modifiedGlow ~= glow then
 			restoreGlow()
 			modifiedGlow = glow
@@ -147,7 +139,6 @@ local function applyHoverHighlight(koala)
 		glow.OutlineTransparency = 0
 		highlight.Enabled = false
 	else
-		-- Use generic global highlight
 		restoreGlow()
 		highlight.Adornee = koala
 		highlight.Enabled = true
@@ -160,8 +151,8 @@ local function getKoalaUnderMouse()
 	local ray = mouse.UnitRay
 
 	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = {player.Character}
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = game:GetService("CollectionService"):GetTagged("KoalaNPC")
 
 	local result = workspace:Raycast(ray.Origin, ray.Direction * 100, params)
 	if not result or not result.Instance then return nil end
@@ -171,6 +162,9 @@ local function getKoalaUnderMouse()
 	if model and game:GetService("CollectionService"):HasTag(model, "KoalaNPC") then
 		local char = player.Character
 		if char and char:FindFirstChild("HumanoidRootPart") then
+			-- For carried koalas, distance is always small
+			if model:GetAttribute("IsBeingCarried") then return model end
+
 			local dist = (char.HumanoidRootPart.Position - target.Position).Magnitude
 			if dist <= INTERACT_DIST then
 				return model
@@ -228,13 +222,13 @@ end
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then return end
 
-	-- Don't open wheel if holding a tool (to avoid conflict with tool clicks/crates)
-	if player.Character and player.Character:FindFirstChildOfClass("Tool") then return end
+	-- Don't open wheel if holding a tool (UNLESS it's a crate)
+	local tool = player.Character and player.Character:FindFirstChildOfClass("Tool")
+	if tool and tool.Name ~= "TransferCrate" then return end
 
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		print("[WheelClient] Click/Touch detected")
 		if wheelGui.Enabled then
-			print("[WheelClient] Closing wheel")
 			wheelGui.Enabled = false
 		else
 			local koala = getKoalaUnderMouse()

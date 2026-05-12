@@ -23,6 +23,54 @@ function TycoonService.ClearProgress(player)
 			playerRepairs[key] = nil
 		end
 	end
+	
+	-- Reset Exhibit Attributes
+	for _, exhibit in ipairs(workspace:GetChildren()) do
+		if exhibit:IsA("Folder") and exhibit.Name:find("_Workspace") then
+			exhibit:SetAttribute("IsRepaired", nil)
+			exhibit:SetAttribute("MaxKoalas", 10)
+			exhibit:SetAttribute("MaxFoodLevel", 100)
+			exhibit:SetAttribute("ExhibitLevel", 1)
+			exhibit:SetAttribute("FeederLevel", 1)
+			exhibit:SetAttribute("FoodLevel", 100)
+		end
+	end
+end
+
+function TycoonService.ResetWorld()
+	print("[TycoonService] Hard Resetting World Visuals...")
+	for _, exhibit in ipairs(workspace:GetChildren()) do
+		if exhibit:IsA("Folder") and exhibit.Name:find("_Workspace") then
+			-- Re-break Fence
+			local fence = exhibit:FindFirstChild("BrokenFence")
+			if fence then
+				fence.Transparency = 1
+				fence.CanCollide = false
+				
+				-- Re-add rubble if needed (or just ensure prompt is back)
+				-- In this case, Initialize() will re-add the prompt
+			end
+			
+			-- Re-break Shelter
+			local shelter = exhibit:FindFirstChild("CollapsedShelter")
+			if shelter then
+				shelter:SetAttribute("IsFixed", nil)
+				local base = shelter:FindFirstChild("Base")
+				local r1 = shelter:FindFirstChild("RoofPiece1")
+				local r2 = shelter:FindFirstChild("RoofPiece2")
+				if base and r1 and r2 then
+					base.Color = Color3.fromRGB(163, 162, 165) -- Grayish
+					r1.Color = Color3.fromRGB(163, 162, 165)
+					r2.Color = Color3.fromRGB(163, 162, 165)
+					r1.Anchored = false -- Let them fall
+					r2.Anchored = false
+				end
+			end
+		end
+	end
+	
+	-- Re-run initialization to restore prompts
+	TycoonService.Initialize()
 end
 
 function TycoonService.UpdateStatus(player, message)
@@ -300,7 +348,7 @@ function TycoonService.Initialize()
 				prompt.HoldDuration = 1.0
 				prompt.Triggered:Connect(function(player)
 					local char = player.Character
-					local tool = char and char:FindFirstChild("Shovel")
+					local tool = char and (char:FindFirstChild("Shovel") or char:FindFirstChild("Garden Shovel"))
 					if tool then
 						prompt.Enabled = false 
 						bush.Transparency = 1

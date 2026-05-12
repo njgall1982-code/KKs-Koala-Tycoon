@@ -57,7 +57,7 @@ function DevService.Initialize()
 
     -- Handle remote actions
     devRemote.OnServerEvent:Connect(function(player, action, data)
-        print("[DevService] Received action: " .. tostring(action))
+        print("[DevService] 🟢 RECEIVED EVENT FROM " .. player.Name .. " | Action: " .. tostring(action))
 
         if action == "SpawnKoala" then
             local stage = data.stage or 1
@@ -87,7 +87,7 @@ function DevService.Initialize()
 
                 -- 2. Spawn Koala
                 local koala = template:Clone()
-                koala.Name = "DevKoala"
+                -- koala.Name = "DevKoala"
                 
                 -- Anchor all parts to prevent falling before CarryService takes over
                 koala:SetAttribute("AI_Disabled", true)
@@ -150,16 +150,45 @@ function DevService.Initialize()
 
         elseif action == "Reset" then
             TycoonService.ClearProgress(player)
+            TycoonService.ResetWorld()
+            
+            -- Clear Koalas
+            for _, koala in ipairs(CollectionService:GetTagged("KoalaNPC")) do
+                koala:Destroy()
+            end
+            
+            -- Reset Stats
             local ls = player:FindFirstChild("leaderstats")
             if ls then
-                ls.Cash.Value = 0
-                ls.Conservation.Value = 0
+                if ls:FindFirstChild("Cash") then ls.Cash.Value = 0 end
+                if ls:FindFirstChild("Conservation") then ls.Conservation.Value = 0 end
             end
+            
+            -- Clear Attributes
             player:SetAttribute("TutorialComplete", nil)
+            player:SetAttribute("HasExhibit", nil)
+            player:SetAttribute("LeafCount", 0)
+            
+            -- Clear Tools
             player.Backpack:ClearAllChildren()
+            local char = player.Character
+            if char then
+                for _, tool in ipairs(char:GetChildren()) do
+                    if tool:IsA("Tool") then tool:Destroy() end
+                end
+            end
+            
+            -- Re-give Basic Tools
             local wand = ServerStorage:FindFirstChild("DevWand")
             if wand then wand:Clone().Parent = player.Backpack end
-            TycoonService.UpdateStatus(player, "🔄 Game Reset!")
+            
+            local hammer = ServerStorage:FindFirstChild("WoodenHammer")
+            if hammer then hammer:Clone().Parent = player.Backpack end
+            
+            local crate = ServerStorage:FindFirstChild("TransferCrate")
+            if crate then crate:Clone().Parent = player.Backpack end
+            
+            TycoonService.UpdateStatus(player, "☢️ HARD RESET COMPLETE!")
 
         elseif action == "Skip" then
             local ls = player:FindFirstChild("leaderstats")

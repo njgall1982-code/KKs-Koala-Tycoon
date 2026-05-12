@@ -18,11 +18,12 @@ local GROWTH_STAGES = {
 	{ stage = 4, name = "Adult",    model = "Koala",           scale = 1.0, minAge = 3600, maxAge = math.huge }, -- 60+ min
 }
 
-local ADULT_PROXIMITY_RADIUS = 15  -- Studs an adult must be within to count as "Protected"
-local CUDDLE_BOOST_DURATION  = 180 -- 3 minutes of boosted growth after cuddle
+local ADULT_PROXIMITY_RADIUS = 50  -- Adults protect babies within 50 studs
+local CUDDLE_BOOST_DURATION  = 30  -- 30 seconds of boosted growth after cuddle
 local GROWTH_TICK_INTERVAL   = 5   -- Check every 5 seconds
 local CUDDLE_SPEED_MULT      = 1.5 -- 1.5x growth speed during Cuddle Boost
 local NORMAL_SPEED_MULT      = 1.0 -- 1.0x growth speed while Protected
+local BACKGROUND_SPEED_MULT  = 0.2 -- 0.2x growth speed even when alone (so they don't get stuck)
 
 -- Rarity configs
 local RARITIES = {
@@ -297,6 +298,13 @@ function KoalaCoreManager.SwapModel(oldKoala, newStageName)
 	-- Remove old koala
 	oldKoala:Destroy()
 
+	-- Notify clients that this koala has swapped (for UI persistence)
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local inspectRemote = ReplicatedStorage:FindFirstChild("InspectKoala")
+	if inspectRemote then
+		inspectRemote:FireAllClients(newKoala)
+	end
+
 	print(string.format("[KoalaCoreManager] %s grew to %s! 🐨", oldName, stageData.name))
 	return newKoala
 end
@@ -410,22 +418,33 @@ local function growthTick()
 		local hrp = koala:FindFirstChild("HumanoidRootPart")
 		local pivotPos = hrp and hrp.Position or koala:GetPivot().Position
 
-		-- Check cuddle boost
-		local cuddleActive = false
-		if cuddleVal and cuddleVal.Value > 0 then
-			cuddleActive = (os.time() - cuddleVal.Value) < CUDDLE_BOOST_DURATION
-		end
+		-- Check cuddle boost (lasts 30s after interaction)
+		local lastCuddle = koala:GetAttribute("LastCuddleTime") or 0
+		local cuddleActive = (workspace:GetServerTimeNow() - lastCuddle) < CUDDLE_BOOST_DURATION
 
-		-- Check adult protection
+		-- Check proximity to adult
 		local protected = isAdultNearby(pivotPos)
 		if protectedVal then protectedVal.Value = protected end
 
-		if not protected and not cuddleActive then
-			continue -- Stasis
+		-- Determine growth speed
+		local speedMult = BACKGROUND_SPEED_MULT
+		local status = "🐌 Growing Slow (Needs an adult!)"
+		
+		if cuddleActive then
+			speedMult = CUDDLE_SPEED_MULT
+			status = "⚡ Cuddle Boosted!"
+		elseif protected then
+			speedMult = NORMAL_SPEED_MULT
+			status = "🏘️ Growing (Protected)"
 		end
 
+		if stageVal.Value >= 4 then
+			status = "✨ Fully Grown"
+		end
+		
+		koala:SetAttribute("GrowthStatus", status)
+
 		-- Grow!
-		local speedMult = cuddleActive and CUDDLE_SPEED_MULT or NORMAL_SPEED_MULT
 		local newAge = ageVal.Value + (GROWTH_TICK_INTERVAL * speedMult)
 		ageVal.Value = newAge
 
@@ -462,22 +481,19 @@ function KoalaCoreManager.Initialize()
 		if not targetKoala or not targetKoala:IsDescendantOf(workspace) then return end
 		
 		if action == "Cuddle" then
-			local stats = targetKoala:FindFirstChild("KoalaStats")
-			if stats and stats:FindFirstChild("LastCuddleTime") then
-				stats.LastCuddleTime.Value = os.time()
-				print("[KoalaCoreManager] " .. player.Name .. " cuddled " .. targetKoala.Name)
+			targetKoala:SetAttribute("LastCuddleTime", workspace:GetServerTimeNow())
+			print("[KoalaCoreManager] " .. player.Name .. " cuddled " .. targetKoala.Name)
 
-				-- Show Heart Emoji Effect
-				KoalaCoreManager.ShowHeartEffect(targetKoala)
+			-- Show Heart Emoji Effect
+			KoalaCoreManager.ShowHeartEffect(targetKoala)
 
-				-- Start physical cuddle interaction via signal
-				local signals = game:GetService("ServerStorage"):FindFirstChild("Signals")
-				local cuddleRequest = signals and signals:FindFirstChild("CuddleRequest")
-				if cuddleRequest then
-					cuddleRequest:Fire(player, targetKoala)
-				else
-					warn("[KoalaCoreManager] CuddleRequest signal not found!")
-				end
+			-- Start physical cuddle interaction via signal
+			local signals = game:GetService("ServerStorage"):FindFirstChild("Signals")
+			local cuddleRequest = signals and signals:FindFirstChild("CuddleRequest")
+			if cuddleRequest then
+				cuddleRequest:Fire(player, targetKoala)
+			else
+				warn("[KoalaCoreManager] CuddleRequest signal not found!")
 			end
 		elseif action == "Follow" then
 			-- Clear any existing follower for this player
@@ -596,12 +612,14 @@ function KoalaCoreManager.RefreshGrowth(koala)
 	if not ageVal or not stageVal then return end
 
 	local currentStage = stageVal.Value
-	local stageData = getStageForAge(ageVal.Value)
-	
-	-- Update attributes
+	local stageData = GROWTH_STAGES[currentStage]
+	local nextStageData = GROWTH_STAGES[currentStage + 1]
+
+	-- Update attributes for UI
 	koala:SetAttribute("Age", ageVal.Value)
-	koala:SetAttribute("MaxAge", stageData.maxAge)
 	koala:SetAttribute("StageName", stageData.name)
+	koala:SetAttribute("StageMin", stageData.minAge)
+	koala:SetAttribute("StageMax", nextStageData and nextStageData.minAge or stageData.minAge)
 	koala:SetAttribute("Stage", stageData.stage)
 	koala:SetAttribute("RevenueMultiplier", KoalaCoreManager.GetRevenueMultiplier(koala))
 

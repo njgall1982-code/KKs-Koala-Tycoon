@@ -5,7 +5,7 @@ This document combines the zoo management systems, the rescue forest adventure, 
 ## Phase 1: The Tutorial ("The Handyman's Debt") DONE
 The game begins with a narrative hook to teach basic mechanics before the tycoon loop starts.
 * **The Setting:** A dusty, overgrown corner of an old sanctuary.
-* **The Mission:** A lonely Koala named **KK** is stuck in a rusted transport crate.
+* **The Mission:** A lonely Koala named **KK** is held by the mean zoo keeper.
 * **Tasks:**
     1. **Repair:** Use a hammer tool to fix 3 collapsed fence segments.
     2. **Gather:** Pick up eucalyptus leaves and place them in the feeder.
@@ -28,12 +28,10 @@ Instead of a shop menu, new koalas are found through active exploration.
     * **Legendary (2%):** Neon/Glowing fur + Heart Trails + Unique accessories.
 
 ## Phase 4: Lifecycle & Growth Mechanics
-Koalas grow through 5 distinct stages. Growth only occurs when "Needs Satisfaction" is >80%.
-1. **Newborn (0.2x):** Must be carried by player or attached to an Adult.
-2. **6 Month (0.4x):** Rides on the back of an Adult Koala.
-3. **1 Year (0.7x):** Waddles on the ground.
-4. **2 Year (0.9x):** Climbs lower tree trunks.
-5. **Adult (1.0x):** Full climbing range and maximum income.
+1. **Newborn**: 0-30 seconds (Test Speed).
+2. **1 Year**: 30-60 seconds.
+3. **2 Year**: 60-90 seconds.
+4. **Adult**: Fully grown after 90 seconds.
 
 ## Phase 5: Zoo Management & Staff (NPCs)
 As the zoo scales, the player hires NPCs to automate maintenance.

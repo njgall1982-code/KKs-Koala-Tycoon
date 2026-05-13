@@ -87,14 +87,25 @@ local currentInspectedKoala = nil
 inspectKoalaRemote.OnClientEvent:Connect(function(koala)
     if not koala then return end
     
+    -- Update reference if model swapped
+    if currentInspectedKoala and currentInspectedKoala.Parent == nil then
+        local oldName = currentInspectedKoala:GetAttribute("DisplayName")
+        local newName = koala:GetAttribute("DisplayName")
+        if oldName == newName then
+            currentInspectedKoala = koala
+            return
+        end
+    end
+
     currentInspectedKoala = koala
-    local gui, frame = createBasePopup("") 
+    local gui, frame = createBasePopup("") -- No generic title
     frame.Size = UDim2.new(0, 320, 0, 280)
     frame.Position = UDim2.new(0.5, -160, 0.5, -140)
     
     local hasBeenNamed = koala:GetAttribute("HasBeenNamed")
     local displayName = koala:GetAttribute("DisplayName") or "Unnamed Koala"
     
+    -- Main Name Title (Replaces Koala Profile)
     local nameLabel = Instance.new("TextLabel", frame)
     nameLabel.Size = UDim2.new(1, 0, 0.2, 0)
     nameLabel.Position = UDim2.new(0, 0, 0.05, 0)
@@ -104,70 +115,111 @@ inspectKoalaRemote.OnClientEvent:Connect(function(koala)
     nameLabel.TextSize = 24
     nameLabel.BackgroundTransparency = 1
 
-    local statusLabel = Instance.new("TextLabel", frame)
-    statusLabel.Size = UDim2.new(1, 0, 0.1, 0)
-    statusLabel.Position = UDim2.new(0, 0, 0.4, 0)
-    statusLabel.Font = Enum.Font.GothamBold
-    statusLabel.TextSize = 12
-    statusLabel.BackgroundTransparency = 1
+    -- Growth Stats
+    local age = koala:GetAttribute("Age") or 0
+    local minAge = koala:GetAttribute("StageMin") or 0
+    local maxAge = koala:GetAttribute("StageMax") or 1
+    local stageName = koala:GetAttribute("StageName") or "Newborn"
+    local isAdult = koala:GetAttribute("IsAdult") or false
+    local gStatus = koala:GetAttribute("GrowthStatus") or "🐌 Growing Slow"
 
     local growthLabel = Instance.new("TextLabel", frame)
     growthLabel.Size = UDim2.new(1, 0, 0.15, 0)
     growthLabel.Position = UDim2.new(0, 0, 0.25, 0)
+    growthLabel.Text = string.format("Stage: %s\nAge: %s", stageName, formatTime(age))
     growthLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
     growthLabel.Font = Enum.Font.GothamMedium
     growthLabel.TextSize = 14
     growthLabel.BackgroundTransparency = 1
-
+    
+    -- Status Label
+    local statusLabel = Instance.new("TextLabel", frame)
+    statusLabel.Size = UDim2.new(1, 0, 0.1, 0)
+    statusLabel.Position = UDim2.new(0, 0, 0.4, 0)
+    statusLabel.Text = gStatus
+    statusLabel.TextColor3 = Color3.new(1, 1, 1)
+    statusLabel.Font = Enum.Font.GothamBold
+    statusLabel.TextSize = 12
+    statusLabel.BackgroundTransparency = 1
+    
+    -- Progress Bar
     local barBackground = Instance.new("Frame", frame)
     barBackground.Size = UDim2.new(0.8, 0, 0.04, 0)
     barBackground.Position = UDim2.new(0.1, 0, 0.5, 0)
     barBackground.BackgroundColor3 = Color3.fromRGB(40, 45, 50)
     Instance.new("UICorner", barBackground)
     
-    local barFill = Instance.new("Frame", barBackground)
-    barFill.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-    Instance.new("UICorner", barFill)
-
-    local function updateUI()
-        local k = currentInspectedKoala
-        if not k then return end
-        
-        local age = k:GetAttribute("Age") or 0
-        local minAge = k:GetAttribute("StageMin") or 0
-        local maxAge = k:GetAttribute("StageMax") or 1
-        local stageName = k:GetAttribute("StageName") or "Newborn"
-        local isAdult = k:GetAttribute("IsAdult") or false
-        local gStatus = k:GetAttribute("GrowthStatus") or ""
-        
-        -- Sync Cuddle Check
-        local lastCuddle = k:GetAttribute("LastCuddleTime") or 0
-        local cuddleActive = (workspace:GetServerTimeNow() - lastCuddle) < 30
-        
-        if cuddleActive then
-            gStatus = "⚡ Cuddle Boosted!"
-        end
-
-        nameLabel.Text = "🐨 " .. (k:GetAttribute("DisplayName") or k.Name)
-        growthLabel.Text = string.format("Stage: %s\nAge: %s", stageName, formatTime(age))
-        statusLabel.Text = gStatus
-        statusLabel.TextColor3 = gStatus:find("Boosted") and Color3.new(1, 1, 0.4) or Color3.fromRGB(180, 255, 180)
-        if gStatus:find("Slow") then statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180) end
-
-        local range = maxAge - minAge
-        local progress = (range > 0) and math.clamp((age - minAge) / range, 0, 1) or 1
-        if isAdult then progress = 1 end
-        barFill.Size = UDim2.new(progress, 0, 1, 0)
-        barFill.BackgroundColor3 = isAdult and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(100, 200, 100)
-    end
-
-    updateUI()
+    local range = maxAge - minAge
+    local progress = (range > 0) and math.clamp((age - minAge) / range, 0, 1) or 1
+    if isAdult then progress = 1 end
     
-    -- Dynamic Refresh Listeners
-    koala:GetAttributeChangedSignal("LastCuddleTime"):Connect(updateUI)
-    koala:GetAttributeChangedSignal("Age"):Connect(updateUI)
-    koala:GetAttributeChangedSignal("GrowthStatus"):Connect(updateUI)
-
+    local barFill = Instance.new("Frame", barBackground)
+    barFill.Size = UDim2.new(progress, 0, 1, 0)
+    barFill.BackgroundColor3 = isAdult and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(100, 200, 100)
+    Instance.new("UICorner", barFill)
+    
+    -- Update Loop for Dynamic Stats
+    task.spawn(function()
+        while gui and gui.Parent do
+            local k = currentInspectedKoala
+            if not k or not k.Parent then 
+                -- Search for the koala again by DisplayName if it was swapped
+                task.wait(0.1)
+                continue 
+            end
+            
+            local success, err = pcall(function()
+                local cAge = k:GetAttribute("Age") or 0
+                local cMin = k:GetAttribute("StageMin") or 0
+                local cMax = k:GetAttribute("StageMax") or 1
+                local cStage = k:GetAttribute("StageName") or "Newborn"
+                local cAdult = k:GetAttribute("IsAdult") or false
+                local cStatus = k:GetAttribute("GrowthStatus") or "🐌 Growing Slow"
+                local cName = k:GetAttribute("DisplayName") or k.Name
+                
+                nameLabel.Text = "🐨 " .. cName
+                growthLabel.Text = string.format("Stage: %s\nAge: %s", cStage, formatTime(cAge))
+                statusLabel.Text = cStatus
+                
+                -- Dynamic coloring for status
+                if cStatus:find("Boosted") then
+                    statusLabel.TextColor3 = Color3.new(1, 1, 0.4) -- Yellow
+                elseif cStatus:find("Protected") then
+                    statusLabel.TextColor3 = Color3.fromRGB(180, 255, 180) -- Green
+                else
+                    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200) -- Gray
+                end
+                
+                local cRange = cMax - cMin
+                local cProgress = (cRange > 0) and math.clamp((cAge - cMin) / cRange, 0, 1) or 1
+                if cAdult then cProgress = 1 end
+                
+                barFill.Size = UDim2.new(cProgress, 0, 1, 0)
+                barFill.BackgroundColor3 = cAdult and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(100, 200, 100)
+            end)
+            
+            if not success then
+                -- Koala likely swapped models, wait for currentInspectedKoala to update from event
+                task.wait(0.5)
+            else
+                task.wait(1)
+            end
+        end
+    end)
+    
+    -- Needs
+    local stats = Instance.new("TextLabel", frame)
+    stats.Size = UDim2.new(1, 0, 0.1, 0)
+    stats.Position = UDim2.new(0, 0, 0.62, 0)
+    
+    local exhibitName = koala:GetAttribute("HomeExhibit")
+    local exhibit = exhibitName and workspace:FindFirstChild(exhibitName)
+    local food = exhibit and exhibit:GetAttribute("FoodLevel") or 100
+    
+    stats.Text = "🥗 Hunger: " .. food .. "%"
+    stats.TextColor3 = (food < 30) and Color3.new(1, 0.4, 0.4) or Color3.new(0.6, 1, 0.6)
+    stats.BackgroundTransparency = 1
+    
     local renameBtn = Instance.new("TextButton", frame)
     renameBtn.Size = UDim2.new(0.7, 0, 0.15, 0)
     renameBtn.Position = UDim2.new(0.15, 0, 0.78, 0)

@@ -8,7 +8,7 @@ local DataStore = {}
 function DataStore.SaveData(player)
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if not leaderstats then return end
-	
+
 	local data = {
 		Cash = leaderstats.Cash.Value,
 		Conservation = leaderstats.Conservation.Value,
@@ -16,7 +16,7 @@ function DataStore.SaveData(player)
 		LeafCount = player:GetAttribute("LeafCount") or 0,
 		OwnedTools = {}
 	}
-	
+
 	local ownedTools = player:FindFirstChild("OwnedTools")
 	if ownedTools then
 		for _, tool in ipairs(ownedTools:GetChildren()) do
@@ -44,27 +44,29 @@ function DataStore.SaveData(player)
 	local CollectionService = game:GetService("CollectionService")
 	local koalas = CollectionService:GetTagged("KoalaNPC")
 	print("[DataStore] 🐨 Checking " .. #koalas .. " koalas for saving...")
-	
+
 	for _, koala in ipairs(koalas) do
 		local stats = koala:FindFirstChild("KoalaStats")
 		local home = koala:GetAttribute("HomeExhibit")
-		
-		if stats then
+
+		if stats and home and home ~= "" then
 			print("[DataStore] ✅ Saving Koala: " .. (koala:GetAttribute("DisplayName") or "Unknown") .. " | Home: " .. tostring(home))
 			table.insert(data.Koalas, {
 				Name = koala.Name,
 				DisplayName = koala:GetAttribute("DisplayName") or koala.Name,
 				Rarity = stats:FindFirstChild("Rarity") and stats.Rarity.Value or "Cute",
 				Age = stats:FindFirstChild("Age") and stats.Age.Value or 0,
-				HomeExhibit = home or ""
+				HomeExhibit = home
 			})
+		else
+			print("[DataStore] ⚠️ Skipping Koala " .. koala.Name .. " (No Stats or HomeExhibit)")
 		end
 	end
 
 	local success, err = pcall(function()
 		PlayerData:SetAsync(tostring(player.UserId), data)
 	end)
-	
+
 	if success then
 		print("[DataStore] ✅ Saved data for " .. player.Name)
 	else
@@ -83,18 +85,18 @@ function DataStore.LoadData(player)
 	he.Name = "HasExhibit"
 	local ot = player:FindFirstChild("OwnedTools") or Instance.new("Folder", player)
 	ot.Name = "OwnedTools"
-	
+
 	local success, result = pcall(function()
 		return PlayerData:GetAsync(tostring(player.UserId))
 	end)
-	
+
 	if success and result then
 		print(string.format("[DataStore] 💾 Loaded data for %s: Cash: %d, Cons: %d", player.Name, result.Cash or 0, result.Conservation or 0))
 		cash.Value = result.Cash or 0
 		cons.Value = result.Conservation or 0
 		he.Value = result.HasExhibit or false
 		player:SetAttribute("LeafCount", result.LeafCount or 0)
-		
+
 		if result.OwnedTools then
 			for _, toolName in ipairs(result.OwnedTools) do
 				local tv = Instance.new("StringValue", ot)
@@ -116,10 +118,14 @@ function DataStore.LoadData(player)
 				end
 			end
 		end
+
 		-- Restore Koalas
 		if result.Koalas and #result.Koalas > 0 then
 			print("[DataStore] 🐨 Attempting to restore " .. #result.Koalas .. " koalas...")
-			local KoalaCoreManager = require(game:GetService("ServerScriptService").Services.KoalaCoreManager)
+			
+			local KoalaLifecycle = require(game:GetService("ServerScriptService").Modules.KoalaLifecycle)
+			local KoalaConfig = require(game:GetService("ReplicatedStorage").Modules.KoalaConfig)
+			
 			task.spawn(function()
 				task.wait(2) -- Extra delay for world stability
 				for _, kData in ipairs(result.Koalas) do
@@ -127,7 +133,7 @@ function DataStore.LoadData(player)
 						print("[DataStore] ⚠️ Skipping koala " .. kData.DisplayName .. " - No HomeExhibit saved.")
 						continue 
 					end
-					
+
 					local exhibit = workspace:FindFirstChild(kData.HomeExhibit)
 					if exhibit then
 						print("[DataStore] 🏗️ Respawning " .. kData.DisplayName .. " in " .. kData.HomeExhibit)
@@ -135,31 +141,24 @@ function DataStore.LoadData(player)
 						local dummy = Instance.new("Model")
 						dummy.Name = kData.Name
 						dummy:SetAttribute("DisplayName", kData.DisplayName)
-						
+
 						local stats = Instance.new("Folder", dummy)
 						stats.Name = "KoalaStats"
-						
+
 						local age = Instance.new("NumberValue", stats)
 						age.Name = "Age"
 						age.Value = kData.Age
-						
+
 						local rarity = Instance.new("StringValue", stats)
 						rarity.Name = "Rarity"
 						rarity.Value = kData.Rarity
-						
-						-- Help RespawnAt determine the correct stage
+
+						-- Help RespawnAt determine the correct stage from Config
+						local stageData = KoalaConfig.GetStageForAge(kData.Age)
 						local stage = Instance.new("IntValue", stats)
 						stage.Name = "Stage"
-						if kData.Name == "KK" or kData.Age >= 3600 then
-							stage.Value = 4
-						elseif kData.Age >= 2400 then
-							stage.Value = 3
-						elseif kData.Age >= 1200 then
-							stage.Value = 2
-						else
-							stage.Value = 1
-						end
-						
+						stage.Value = stageData.stage
+
 						-- Use RespawnAt with a random scatter to avoid stacking
 						local ground = exhibit:FindFirstChild("Ground") or exhibit:FindFirstChildOfClass("BasePart")
 						local basePos = ground and ground.Position or Vector3.new(0, 5, 0)
@@ -169,8 +168,8 @@ function DataStore.LoadData(player)
 							2, -- Spawn slightly above ground
 							math.random(-scatter, scatter)
 						)
-						
-						KoalaCoreManager.RespawnAt(dummy, spawnPos, exhibit)
+
+						KoalaLifecycle.RespawnAt(dummy, spawnPos, exhibit)
 					else
 						print("[DataStore] ❌ Could not find exhibit: " .. kData.HomeExhibit .. " for koala " .. kData.DisplayName)
 					end
@@ -186,7 +185,7 @@ function DataStore.LoadData(player)
 		he.Value = false
 		player:SetAttribute("LeafCount", 0)
 	end
-	
+
 	player:SetAttribute("DataLoaded", true)
 end
 

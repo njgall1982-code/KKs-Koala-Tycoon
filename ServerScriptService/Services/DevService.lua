@@ -7,7 +7,9 @@ local ServerStorage = game:GetService("ServerStorage")
 local CollectionService = game:GetService("CollectionService")
 
 local TycoonService = require(game:GetService("ServerScriptService").Services.TycoonService)
-local KoalaCoreManager = require(game:GetService("ServerScriptService").Services.KoalaCoreManager)
+local KoalaConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("KoalaConfig"))
+local KoalaLifecycle = require(game:GetService("ServerScriptService"):WaitForChild("Modules"):WaitForChild("KoalaLifecycle"))
+local KoalaGrowth = require(game:GetService("ServerScriptService"):WaitForChild("Modules"):WaitForChild("KoalaGrowth"))
 local CarryService = require(game:GetService("ServerScriptService").Services.CarryService)
 
 local DevService = {}
@@ -57,7 +59,8 @@ function DevService.Initialize()
 
     -- Handle remote actions
     devRemote.OnServerEvent:Connect(function(player, action, data)
-        print("[DevService] 🟢 RECEIVED EVENT FROM " .. player.Name .. " | Action: " .. tostring(action))
+        print('[DevService] 🟢 RECEIVED EVENT FROM ' .. player.Name .. ' | Action: ' .. tostring(action))
+        print("[DevService] Received action: " .. tostring(action))
 
         if action == "SpawnKoala" then
             local stage = data.stage or 1
@@ -100,7 +103,7 @@ function DevService.Initialize()
                 koala:PivotTo(player.Character:GetPivot() * CFrame.new(0, 5, -5))
                 koala:ScaleTo(d.scale)
                 
-                KoalaCoreManager.InitKoala(koala, rarity, d.age)
+                KoalaLifecycle.InitKoala(koala, rarity, d.age)
 
                 -- 3. Force Pickup into Crate
                 if crate and crate:FindFirstChild("Handle") then
@@ -131,7 +134,7 @@ function DevService.Initialize()
                             stats.Age.Value = thresholds[stats.Stage.Value] or 3602
                             
                             -- Force immediate sync and growth check
-                            KoalaCoreManager.RefreshGrowth(koala)
+                            KoalaGrowth.RefreshGrowth(koala)
                             
                             count += 1
                         end

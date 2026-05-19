@@ -32,8 +32,8 @@ function KoalaCoreManager.Initialize()
 			-- Show Heart Emoji Effect
 			KoalaVFX.ShowHeartEffect(targetKoala)
 
-			-- Force immediate UI/status update for the cuddle boost
-			KoalaGrowth.UpdateGrowthStatus(targetKoala)
+			-- Force immediate UI/status update AND check for growth
+			KoalaGrowth.RefreshGrowth(targetKoala)
 
 			-- Start physical cuddle interaction via signal
 			local signals = ServerStorage:FindFirstChild("Signals")
@@ -90,3 +90,5 @@ function KoalaCoreManager.Initialize()
 end
 
 return KoalaCoreManager
+
+

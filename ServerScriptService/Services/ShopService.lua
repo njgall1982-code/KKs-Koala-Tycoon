@@ -106,7 +106,7 @@ function ShopService.HandlePurchaseRequest(player, toolName, price)
 
     -- Decoupled Transaction Request
     local success, reason = transactionRequest:Invoke(player, expectedPrice, "Purchase_" .. toolName)
-    
+	
     if success then
         awardTool:Fire(player, toolName, not consumable)
         purchaseEvent:FireClient(player, true, toolName, "Purchase successful!")

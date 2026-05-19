@@ -52,7 +52,7 @@ function KoalaGrowth.RefreshGrowth(koala)
 	koala:SetAttribute("IsAdult", stageData.stage >= 4)
 	koala:SetAttribute("RevenueMultiplier", KoalaConfig.GetRevenueMultiplier(koala))
 
-	-- Update growth status label
+	-- Ensure growth status is also updated so UI doesn't lag
 	KoalaGrowth.UpdateGrowthStatus(koala)
 
 	-- Check for growth

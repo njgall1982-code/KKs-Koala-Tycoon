@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local KoalaConfig = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("KoalaConfig"))
 local KoalaVFX    = require(game:GetService("ServerScriptService"):WaitForChild("Modules"):WaitForChild("KoalaVFX"))
+local KoalaSystem = require(game:GetService("ServerScriptService"):WaitForChild("Services"):WaitForChild("KoalaSystem"))
 
 -- ============================================================
 -- HELPERS
@@ -83,6 +84,9 @@ function KoalaLifecycle.InitKoala(koala, rarityName, startAge)
 
 	-- Apply rarity aura
 	KoalaVFX.ApplyRarityAura(koala, rarityVal.Value)
+
+	-- Instant Bone Initialization: Ensure zero delay/contortion on spawn
+	KoalaSystem.InitKoala(koala)
 end
 
 function KoalaLifecycle.SwapModel(oldKoala, newStageName)
@@ -110,6 +114,12 @@ function KoalaLifecycle.SwapModel(oldKoala, newStageName)
 	local homeExhibit = oldKoala:GetAttribute("HomeExhibit")
 	local oldPos     = oldKoala:GetPivot()
 
+	-- DEBUG: Log before swap
+	print("[KoalaLifecycle.SwapModel] GROWTH DEBUG:")
+	print("  - Old koala HRP Y: " .. (oldKoala:FindFirstChild("HumanoidRootPart") and oldKoala:FindFirstChild("HumanoidRootPart").Position.Y or "nil"))
+	print("  - Old pivot Y: " .. oldPos.Position.Y)
+	print("  - New template WorldPivot Y: " .. template.WorldPivot.Position.Y)
+
 	-- Spawn new model
 	local newKoala = template:Clone()
 	newKoala.Name = oldKoala.Name
@@ -121,7 +131,14 @@ function KoalaLifecycle.SwapModel(oldKoala, newStageName)
 	newKoala:SetAttribute("HasBeenNamed", hasNamed)
 
 	newKoala.Parent = oldKoala.Parent or workspace
+	
+	-- DEBUG: Log before PivotTo
+	print("  - New koala HRP before PivotTo Y: " .. newKoala:FindFirstChild("HumanoidRootPart").Position.Y)
+	
 	newKoala:PivotTo(oldPos)
+	
+	-- DEBUG: Log after PivotTo
+	print("  - New koala HRP after PivotTo Y: " .. newKoala:FindFirstChild("HumanoidRootPart").Position.Y)
 
 	-- Init lifecycle stats
 	KoalaLifecycle.InitKoala(newKoala, oldRarity, oldAge)
@@ -167,9 +184,19 @@ function KoalaLifecycle.RespawnAt(oldKoala, pos, parent)
 
 	newKoala.Parent = workspace
 
-	local hrp = newKoala:FindFirstChild("HumanoidRootPart")
-	local hrpHeight = hrp and hrp.Size.Y / 2 or 0.95
-	newKoala:PivotTo(CFrame.new(pos + Vector3.new(0, hrpHeight, 0)))
+	-- Position koala at the spawn point
+	-- The mesh PivotOffset already accounts for visual positioning
+	
+	-- DEBUG: Log spawn positioning
+	print("[KoalaLifecycle.RespawnAt] SPAWN DEBUG:")
+	print("  - Template WorldPivot Y: " .. template.WorldPivot.Position.Y)
+	print("  - Spawn position Y: " .. pos.Y)
+	print("  - HRP before PivotTo Y: " .. newKoala:FindFirstChild("HumanoidRootPart").Position.Y)
+	
+	newKoala:PivotTo(CFrame.new(pos))
+	
+	print("  - HRP after PivotTo Y: " .. newKoala:FindFirstChild("HumanoidRootPart").Position.Y)
+	print("  - Model GetPivot Y: " .. newKoala:GetPivot().Position.Y)
 
 	if parent then 
 		newKoala.Parent = parent 

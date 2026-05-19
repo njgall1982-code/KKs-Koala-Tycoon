@@ -180,7 +180,7 @@ RunService.RenderStepped:Connect(function()
 		applyHoverHighlight(currentKoala)
 		return 
 	end
-	
+
 	local koala = getKoalaUnderMouse()
 	if koala then
 		applyHoverHighlight(koala)
@@ -207,10 +207,10 @@ local function updateWheelState()
 	if followBtn and currentKoala then
 		local followingPlayer = currentKoala:GetAttribute("FollowingPlayer")
 		local isFollowingMe = followingPlayer == player.Name
-		
+
 		followBtn.Text = isFollowingMe and "🛑" or "👣"
 		followBtn:SetAttribute("CurrentAction", isFollowingMe and "Stay" or "Follow")
-		
+
 		local label = followBtn:FindFirstChild("Label")
 		if label then
 			label.Text = isFollowingMe and "Stay" or "Follow"

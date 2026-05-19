@@ -8,11 +8,6 @@ local CollectionService = game:GetService("CollectionService")
 local signals = ServerStorage:WaitForChild("Signals")
 local updateQuestSignal = signals:WaitForChild("UpdateQuest")
 local forcePickupSignal = signals:WaitForChild("ForcePickup")
-local showStatusSignal = signals:WaitForChild("ShowStatus")
-
-showStatusSignal.Event:Connect(function(player, message)
-	TycoonService.UpdateStatus(player, message)
-end)
 
 local playerRepairs = {}
 

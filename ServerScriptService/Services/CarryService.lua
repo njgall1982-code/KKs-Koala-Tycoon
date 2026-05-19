@@ -3,7 +3,7 @@ local CarryService = {}
 function CarryService.Initialize()
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local koalaAction = ReplicatedStorage:WaitForChild("KoalaAction")
-	
+
 	koalaAction.OnServerEvent:Connect(function(player, action, targetKoala)
 		if action == "Carry" then
 			CarryService.PickUp(player, targetKoala)
@@ -33,7 +33,7 @@ local function setArms(player, hold)
 	if not char then return end
 	local hum = char:FindFirstChild("Humanoid")
 	if not hum then return end
-	
+
 	local function updateMotor(motor, targetC0)
 		if motor and motor:IsA("Motor6D") then
 			pcall(function()
@@ -64,22 +64,22 @@ function CarryService.PickUp(player, targetModel, weldTarget, isCuddle)
 	print("[CarryService] PickUp called for " .. player.Name .. " target: " .. (targetModel and targetModel.Name or "nil"))
 	local character = player.Character
 	if not character then return end
-	
+
 	local rootPart = character:FindFirstChild("HumanoidRootPart")
 	local humanoid = character:FindFirstChild("Humanoid")
 	if not rootPart or not humanoid then return end
-	
+
 	-- Force unequip other tools
 	humanoid:UnequipTools()
-	
+
 	-- Rotate Arms
 	pcall(function() setArms(player, true) end)
-	
+
 	-- Disable target AI/Physics
 	targetModel:SetAttribute("AI_Disabled", true)
 	local targetRoot = targetModel:FindFirstChild("HumanoidRootPart") or targetModel:FindFirstChildOfClass("Part")
 	if not targetRoot then return end
-	
+
 	-- Position target
 	if weldTarget then
 		if weldTarget:IsA("Attachment") then
@@ -92,7 +92,7 @@ function CarryService.PickUp(player, targetModel, weldTarget, isCuddle)
 	else
 		targetModel:PivotTo(rootPart.CFrame * CFrame.new(0.7, -0.4, -0.6) * CFrame.Angles(0, math.rad(90), 0))
 	end
-	
+
 	-- Make parts ghost-like and weightless
 	for _, p in pairs(targetModel:GetDescendants()) do
 		if p:IsA("BasePart") then
@@ -103,7 +103,7 @@ function CarryService.PickUp(player, targetModel, weldTarget, isCuddle)
 			if p.Name == "HumanoidRootPart" then p.Transparency = 1 end
 		end
 	end
-	
+
 	-- Create Weld
 	local weld = Instance.new("WeldConstraint")
 	weld.Name = "CarryWeld"
@@ -114,18 +114,18 @@ function CarryService.PickUp(player, targetModel, weldTarget, isCuddle)
 	weld.Part0 = part0 or rootPart
 	weld.Part1 = targetRoot
 	weld.Parent = targetRoot
-	
+
 	-- Parent to container
 	if part0 then
 		targetModel.Parent = part0.Parent
 	end
-	
+
 	-- Disable target physics
 	local targetHum = targetModel:FindFirstChild("Humanoid")
 	if targetHum then
 		targetHum.PlatformStand = true
 	end
-	
+
 	player:SetAttribute("Carrying", targetModel.Name)
 	targetModel:SetAttribute("IsBeingCarried", true)
 	targetModel:SetAttribute("FollowingPlayer", nil)
@@ -138,18 +138,18 @@ function CarryService.PerformCuddle(player, koala)
 	local char = player.Character
 	local hum = char and char:FindFirstChild("Humanoid")
 	if not hum then return end
-	
+
 	local oldSpeed = hum.WalkSpeed
 	local oldJump = hum.JumpPower
 	hum.WalkSpeed = 0
 	hum.JumpPower = 0
-	
+
 	CarryService.PickUp(player, koala, nil, true)
 	task.wait(2)
-	
+
 	local dropPos = char.HumanoidRootPart.CFrame * CFrame.new(0, -1.5, -1.5)
 	CarryService.Drop(player, dropPos)
-	
+
 	hum.WalkSpeed = oldSpeed
 	hum.JumpPower = oldJump
 end
@@ -161,14 +161,14 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 
 	local character = player.Character
 	if not character then return end
-	
+
 	local carryingName = player:GetAttribute("Carrying")
 	if not carryingName then return end
-	
+
 	-- Find the carried model
 	local searchContainers = {character, player.Backpack, workspace}
 	local targetModel = nil
-	
+
 	for _, container in ipairs(searchContainers) do
 		for _, m in pairs(container:GetDescendants()) do
 			if m:IsA("Model") and m.Name == carryingName and m:GetAttribute("IsBeingCarried") then
@@ -179,11 +179,11 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 		end
 		if targetModel then break end
 	end
-	
+
 	if targetModel then
 		local exhibitName = explicitExhibitName
 		local dropParent = nil
-		
+
 		-- 1. Identify Exhibit (Optimized)
 		if not exhibitName then
 			for _, folder in ipairs(workspace:GetChildren()) do
@@ -240,7 +240,7 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 		-- Clean Arms
 		pcall(function() setArms(player, false) end)
 		player:SetAttribute("Carrying", nil)
-		
+
 		-- Respawn
 		local spawnPos = dropCFrame.Position
 		if dropParent and dropParent:FindFirstChild("Ground") then
@@ -259,7 +259,7 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 		if respawnRequest then
 			respawnRequest:Fire(targetModel, spawnPos, dropParent)
 		end
-		
+
 		-- Tutorial Reward Logic
 		if exhibitName == "TutorialExhibit_Workspace" and carryingName == "KK" then
 			local hasExhibit = player:FindFirstChild("HasExhibit")

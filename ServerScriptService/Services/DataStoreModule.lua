@@ -122,10 +122,10 @@ function DataStore.LoadData(player)
 		-- Restore Koalas
 		if result.Koalas and #result.Koalas > 0 then
 			print("[DataStore] 🐨 Attempting to restore " .. #result.Koalas .. " koalas...")
-			
+
 			local KoalaLifecycle = require(game:GetService("ServerScriptService").Modules.KoalaLifecycle)
 			local KoalaConfig = require(game:GetService("ReplicatedStorage").Modules.KoalaConfig)
-			
+
 			task.spawn(function()
 				task.wait(2) -- Extra delay for world stability
 				for _, kData in ipairs(result.Koalas) do
@@ -163,10 +163,14 @@ function DataStore.LoadData(player)
 						local ground = exhibit:FindFirstChild("Ground") or exhibit:FindFirstChildOfClass("BasePart")
 						local basePos = ground and ground.Position or Vector3.new(0, 5, 0)
 						local scatter = 8 -- Studs of scatter
-						local spawnPos = basePos + Vector3.new(
-							math.random(-scatter, scatter),
-							2, -- Spawn slightly above ground
-							math.random(-scatter, scatter)
+						-- Calculate ground surface position
+						local groundHeight = ground and ground.Size.Y / 2 or 0
+						local surfaceY = basePos.Y + groundHeight
+						
+						local spawnPos = Vector3.new(
+							basePos.X + math.random(-scatter, scatter),
+							surfaceY + 1, -- 1 stud above ground to match workspace koala
+							basePos.Z + math.random(-scatter, scatter)
 						)
 
 						KoalaLifecycle.RespawnAt(dummy, spawnPos, exhibit)

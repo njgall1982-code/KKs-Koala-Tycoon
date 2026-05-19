@@ -1,62 +1,46 @@
 local ExhibitStatService = {}
 
+local TextService = game:GetService("TextService")
+local Players = game:GetService("Players")
+
 function ExhibitStatService.Initialize()
+	-- Look for all exhibits and create signs
 	for _, exhibit in ipairs(workspace:GetChildren()) do
-		if exhibit.Name:find("Exhibit_Workspace") then
+		if exhibit:IsA("Folder") and exhibit.Name:find("_Workspace") then
 			ExhibitStatService.CreateSign(exhibit)
-			
-			-- Listen for changes
-			exhibit:GetAttributeChangedSignal("FoodLevel"):Connect(function()
-				ExhibitStatService.UpdateSign(exhibit)
-			end)
-			exhibit:GetAttributeChangedSignal("DisplayName"):Connect(function()
-				ExhibitStatService.UpdateSign(exhibit)
-			end)
-			
-			-- Add a ProximityPrompt to the board for Management
-			local anchor = exhibit:FindFirstChild("SignAnchor") or exhibit:FindFirstChild("Ground")
-			if anchor then
-				local prompt = anchor:FindFirstChild("ManagePrompt") or Instance.new("ProximityPrompt")
-				prompt.Name = "ManagePrompt"
-				prompt.ActionText = "Manage Exhibit ⚙️"
-				prompt.ObjectText = exhibit:GetAttribute("DisplayName") or exhibit.Name:gsub("_Workspace", "")
-				prompt.HoldDuration = 0.5
-				prompt.MaxActivationDistance = 12
-				prompt.Parent = anchor
-				
-				prompt.Triggered:Connect(function(player)
-					-- Fire a local event or signal to open the Management UI
-					local ReplicatedStorage = game:GetService("ReplicatedStorage")
-					local remote = ReplicatedStorage:FindFirstChild("OpenExhibitManage")
-					if not remote then
-						remote = Instance.new("RemoteEvent")
-						remote.Name = "OpenExhibitManage"
-						remote.Parent = ReplicatedStorage
-					end
-					remote:FireClient(player, exhibit:GetFullName())
-				end)
-			end
-			
-			-- Periodic refresh for koala count
-			task.spawn(function()
-				while true do
-					task.wait(5)
-					ExhibitStatService.UpdateSign(exhibit)
-				end
-			end)
 		end
 	end
-	
-	-- Handle Rename signal
-	local ReplicatedStorage = game:GetService("ReplicatedStorage")
-	local renameExhibit = ReplicatedStorage:FindFirstChild("RenameExhibit")
-	if renameExhibit then
-		renameExhibit.OnServerEvent:Connect(function(player, target, newName)
-			ExhibitStatService.RenameExhibit(player, target, newName)
-		end)
-	end
+
+	-- Periodically update all signs
+	task.spawn(function()
+		while true do
+			task.wait(2) -- Update every 2 seconds
+			for _, exhibit in ipairs(workspace:GetChildren()) do
+				if exhibit:IsA("Folder") and exhibit.Name:find("_Workspace") then
+					ExhibitStatService.UpdateSign(exhibit)
+				end
+			end
+		end
+	end)
 
 	print("[ExhibitStatService] Initialized.")
+	
+	-- Listen for Rename requests from clients
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local remote = ReplicatedStorage:WaitForChild("RenameExhibit")
+	remote.OnServerEvent:Connect(function(player, exhibitPath, newName)
+		-- Security: The client sends a path string, we find the actual folder
+		local pathParts = string.split(exhibitPath, ".")
+		local target = game
+		for _, part in ipairs(pathParts) do
+			target = target:FindFirstChild(part)
+			if not target then break end
+		end
+		
+		if target and target:IsA("Folder") and target.Name:find("_Workspace") then
+			ExhibitStatService.RenameExhibit(player, target, newName)
+		end
+	end)
 end
 
 function ExhibitStatService.CreateSign(exhibit)
@@ -88,31 +72,37 @@ function ExhibitStatService.CreateSign(exhibit)
 	-- Create BillboardGui
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "StatSign"
-	billboard.Size = UDim2.new(6, 0, 4, 0)
-	billboard.StudsOffset = Vector3.new(0, 5, 0)
+	billboard.Size = UDim2.new(8, 0, 4, 0) -- Measured in STUDS now
+	billboard.Adornee = anchor
+	billboard.ExtentsOffset = Vector3.new(0, 3, 0)
 	billboard.AlwaysOnTop = false
+	billboard.MaxDistance = 50
 	billboard.Parent = anchor
 
+	-- Premium Background (Glassmorphism)
 	local frame = Instance.new("Frame", billboard)
-	frame.Name = "Frame"
 	frame.Size = UDim2.new(1, 0, 1, 0)
-	frame.BackgroundColor3 = Color3.fromRGB(30, 35, 40)
-	frame.BackgroundTransparency = 0.2
+	frame.BackgroundColor3 = Color3.fromRGB(20, 25, 30)
+	frame.BackgroundTransparency = 0.25
+	frame.BorderSizePixel = 0
 
-	local corner = Instance.new("UICorner", frame)
-	corner.CornerRadius = UDim.new(0.1, 0)
+	local uiCorner = Instance.new("UICorner", frame)
+	uiCorner.CornerRadius = UDim.new(0, 12)
 
-	local stroke = Instance.new("UIStroke", frame)
-	stroke.Thickness = 3
-	stroke.Color = Color3.fromRGB(150, 255, 150)
+	-- Add a subtle border
+	local uiStroke = Instance.new("UIStroke", frame)
+	uiStroke.Color = Color3.fromRGB(255, 255, 255)
+	uiStroke.Transparency = 0.8
+	uiStroke.Thickness = 2
 
 	local title = Instance.new("TextLabel", frame)
 	title.Name = "ExhibitName"
-	title.Size = UDim2.new(1, 0, 0.4, 0)
-	title.Text = exhibit.Name:gsub("_Workspace", "")
-	title.TextColor3 = Color3.new(1, 1, 1)
+	title.Size = UDim2.new(1, 0, 0.45, 0)
+	title.Position = UDim2.new(0, 0, 0.05, 0)
+	title.Text = exhibit:GetAttribute("DisplayName") or exhibit.Name:gsub("_Workspace", "")
+	title.TextColor3 = Color3.fromRGB(255, 255, 255)
 	title.Font = Enum.Font.GothamBold
-	title.TextSize = 24
+	title.TextSize = 22
 	title.BackgroundTransparency = 1
 
 	local stats = Instance.new("TextLabel", frame)
@@ -125,8 +115,6 @@ function ExhibitStatService.CreateSign(exhibit)
 	stats.TextSize = 16
 	stats.BackgroundTransparency = 1
 	stats.TextYAlignment = Enum.TextYAlignment.Top
-	
-	ExhibitStatService.UpdateSign(exhibit)
 end
 
 function ExhibitStatService.UpdateSign(exhibit)
@@ -165,20 +153,22 @@ function ExhibitStatService.UpdateSign(exhibit)
 
 	-- Color change based on food
 	if food < 20 then
-		frame.Stats.TextColor3 = Color3.fromRGB(255, 100, 100)
+		frame.Stats.TextColor3 = Color3.fromRGB(255, 100, 100) -- Red alert
+	elseif food < 50 then
+		frame.Stats.TextColor3 = Color3.fromRGB(255, 200, 100) -- Yellow warning
 	else
-		frame.Stats.TextColor3 = Color3.fromRGB(150, 255, 150)
+		frame.Stats.TextColor3 = Color3.fromRGB(200, 255, 200) -- Green good
 	end
 end
 
+-- Server-side naming (safely filtered)
 function ExhibitStatService.RenameExhibit(player, exhibit, newName)
 	if not exhibit or not newName then return end
-	
-	-- Basic filter (Roblox will filter automatically on set, but we handle it clean)
-	local TextService = game:GetService("TextService")
+
+	-- SAFETY FIRST: Filter the text for Roblox
 	local success, filteredText = pcall(function()
-		local result = TextService:FilterStringAsync(newName, player.UserId)
-		return result:GetNonChatStringForBroadcastAsync()
+		local filterResult = TextService:FilterStringAsync(newName, player.UserId)
+		return filterResult:GetNonChatStringForBroadcastAsync()
 	end)
 
 	if success then

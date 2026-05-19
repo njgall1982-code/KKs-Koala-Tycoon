@@ -1,8 +1,11 @@
 local HungerService = {}
+
 local RunService = game:GetService("RunService")
+
 -- Config
 local HUNGER_TICK_INTERVAL = 60 -- Every 60 seconds
 local FOOD_LOSS_PER_TICK = 5   -- Lose 5% food per minute
+
 function HungerService.Initialize()
 	-- Initialize exhibits with default attributes if missing
 	for _, exhibit in ipairs(workspace:GetChildren()) do
@@ -30,6 +33,7 @@ function HungerService.Initialize()
 	end)
 	print("[HungerService] Initialized with dynamic scaling.")
 end
+
 function HungerService.DepleteAllExhibits()
 	local CollectionService = game:GetService("CollectionService")
 
@@ -59,4 +63,5 @@ function HungerService.DepleteAllExhibits()
 		end
 	end
 end
+
 return HungerService

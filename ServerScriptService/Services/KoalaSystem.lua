@@ -86,6 +86,7 @@ local function initKoala(koala)
 	end
 	humanoid.WalkSpeed = WALK_SPEED
 	humanoid.AutoRotate = true
+	humanoid.HipHeight = 0
 
 	if not koala:GetAttribute("AI_Disabled") then
 		for _, p in ipairs(koala:GetDescendants()) do
@@ -114,15 +115,41 @@ local function initKoala(koala)
 		treePos = nil,
 		lastPos = hrp.Position,
 		stuckTimer = 0,
-		baseRotations = {
-			hips = bones.hips and bones.hips.CFrame or CFrame.new(),
-			chest = bones.chest and bones.chest.CFrame or CFrame.new(),
-			head = bones.head and bones.head.CFrame or CFrame.new(),
-			frontleg = bones.frontleg and bones.frontleg.CFrame or CFrame.new(),
-			R_frontleg = bones.R_frontleg and bones.R_frontleg.CFrame or CFrame.new(),
-			backleg = bones.backleg and bones.backleg.CFrame or CFrame.new(),
-			R_backleg = bones.R_backleg and bones.R_backleg.CFrame or CFrame.new(),
-		}
+		rigType = bones.head and bones.head.Name == "CC_Base_Head" and "Biped_CCBase" or "Biped_Legacy",
+		bones = bones,
+		baseRotations = (function()
+			local rigType = bones.head and bones.head.Name == "CC_Base_Head" and "Biped_CCBase" or "Biped_Legacy"
+			if rigType == "Biped_CCBase" then
+				return {
+					hips = (function()
+						if not bones.hips then return CFrame.new() end
+						if not bones.hips:GetAttribute("PristineCFrame") then
+							local pristine = bones.hips.CFrame
+							bones.hips:SetAttribute("PristineCFrame", pristine)
+							return pristine
+						else
+							return bones.hips:GetAttribute("PristineCFrame")
+						end
+					end)(),
+					chest = bones.chest and bones.chest.CFrame or CFrame.new(),
+					head = bones.head and bones.head.CFrame or CFrame.new(),
+					frontleg = bones.frontleg and bones.frontleg.CFrame or CFrame.new(),
+					R_frontleg = bones.R_frontleg and bones.R_frontleg.CFrame or CFrame.new(),
+					backleg = bones.backleg and bones.backleg.CFrame or CFrame.new(),
+					R_backleg = bones.R_backleg and bones.R_backleg.CFrame or CFrame.new(),
+				}
+			else
+				return {
+					hips = bones.hips and bones.hips.CFrame or CFrame.new(),
+					chest = bones.chest and bones.chest.CFrame or CFrame.new(),
+					head = bones.head and bones.head.CFrame or CFrame.new(),
+					frontleg = bones.frontleg and bones.frontleg.CFrame or CFrame.new(),
+					R_frontleg = bones.R_frontleg and bones.R_frontleg.CFrame or CFrame.new(),
+					backleg = bones.backleg and bones.backleg.CFrame or CFrame.new(),
+					R_backleg = bones.R_backleg and bones.R_backleg.CFrame or CFrame.new(),
+				}
+			end
+		end)()
 	}
 	koalaStates[koala] = state
 	return true
@@ -171,16 +198,72 @@ local function findNearestTree(hrp)
 	return nearestTree
 end
 
+-- ============================================================
+-- ANIMATION PROFILES (Cleanly separated per model/rig type!)
+-- ============================================================
+local AnimationProfiles = {
+	["Biped_Legacy"] = {
+		animate = function(state, dt, speed, waddleRad)
+			local bones = state.bones
+			local base = state.baseRotations
+			if bones.hips then
+				local waddleAngle = math.sin(state.animTime * WADDLE_SPEED / WALK_SPEED) * waddleRad
+				local bounce = math.abs(math.sin(state.animTime * WADDLE_SPEED / WALK_SPEED * 2)) * 0.1 * state.currentSpeed
+				bones.hips.CFrame = base.hips * CFrame.new(0, bounce, 0) * CFrame.Angles(0, 0, waddleAngle)
+			end
+			local legAngle = math.sin(state.animTime * WADDLE_SPEED / WALK_SPEED) * math.rad(20) * state.currentSpeed
+			if bones.frontleg then bones.frontleg.CFrame = base.frontleg * CFrame.Angles(legAngle, 0, 0) end
+			if bones.R_frontleg then bones.R_frontleg.CFrame = base.R_frontleg * CFrame.Angles(-legAngle, 0, 0) end
+			if bones.backleg then bones.backleg.CFrame = base.backleg * CFrame.Angles(-legAngle, 0, 0) end
+			if bones.R_backleg then bones.R_backleg.CFrame = base.R_backleg * CFrame.Angles(legAngle, 0, 0) end
+			if bones.head then bones.head.CFrame = base.head * CFrame.Angles(math.rad(speed * 2), 0, 0) end
+		end,
+		carry = function(state)
+			local bones = state.bones
+			local base = state.baseRotations
+			local clingAngle = math.rad(45)
+			if bones.frontleg then bones.frontleg.CFrame = base.frontleg * CFrame.Angles(clingAngle, 0, 0) end
+			if bones.R_frontleg then bones.R_frontleg.CFrame = base.R_frontleg * CFrame.Angles(clingAngle, 0, 0) end
+			if bones.backleg then bones.backleg.CFrame = base.backleg * CFrame.Angles(-clingAngle, 0, 0) end
+			if bones.R_backleg then bones.R_backleg.CFrame = base.R_backleg * CFrame.Angles(-clingAngle, 0, 0) end
+			if bones.hips then bones.hips.CFrame = base.hips end
+			if bones.head then bones.head.CFrame = base.head end
+		end
+	},
+	["Biped_CCBase"] = {
+		animate = function(state, dt, speed, waddleRad)
+			local bones = state.bones
+			local base = state.baseRotations
+			if bones.hips then
+				local waddleAngle = math.sin(state.animTime * WADDLE_SPEED / WALK_SPEED) * waddleRad
+				local bounce = math.abs(math.sin(state.animTime * WADDLE_SPEED / WALK_SPEED * 2)) * 0.1 * state.currentSpeed
+				bones.hips.CFrame = base.hips * CFrame.new(0, bounce, 0) * CFrame.Angles(0, 0, waddleAngle)
+			end
+			local legAngle = math.sin(state.animTime * WADDLE_SPEED / WALK_SPEED) * math.rad(25) * state.currentSpeed
+			if bones.frontleg then bones.frontleg.CFrame = base.frontleg * CFrame.Angles(legAngle, 0, 0) end
+			if bones.R_frontleg then bones.R_frontleg.CFrame = base.R_frontleg * CFrame.Angles(-legAngle, 0, 0) end
+			if bones.backleg then bones.backleg.CFrame = base.backleg * CFrame.Angles(-legAngle, 0, 0) end
+			if bones.R_backleg then bones.R_backleg.CFrame = base.R_backleg * CFrame.Angles(legAngle, 0, 0) end
+			if bones.head then bones.head.CFrame = base.head * CFrame.Angles(math.rad(speed * 2), 0, 0) end
+		end,
+		carry = function(state)
+			local bones = state.bones
+			local base = state.baseRotations
+			local clingAngle = math.rad(45)
+			if bones.frontleg then bones.frontleg.CFrame = base.frontleg * CFrame.Angles(clingAngle, 0, 0) end
+			if bones.R_frontleg then bones.R_frontleg.CFrame = base.R_frontleg * CFrame.Angles(clingAngle, 0, 0) end
+			if bones.backleg then bones.backleg.CFrame = base.backleg * CFrame.Angles(-clingAngle, 0, 0) end
+			if bones.R_backleg then bones.R_backleg.CFrame = base.R_backleg * CFrame.Angles(-clingAngle, 0, 0) end
+			if bones.hips then bones.hips.CFrame = base.hips end
+			if bones.head then bones.head.CFrame = base.head end
+		end
+	}
+}
+
 local function animateKoala(state, dt)
+	local profile = AnimationProfiles[state.rigType] or AnimationProfiles["Biped_Legacy"]
 	if state.koala:GetAttribute("IsBeingCarried") then
-		local bones = state.bones
-		local base = state.baseRotations
-		local clingAngle = math.rad(45)
-		if bones.frontleg then bones.frontleg.CFrame = base.frontleg * CFrame.Angles(clingAngle, 0, 0) end
-		if bones.R_frontleg then bones.R_frontleg.CFrame = base.R_frontleg * CFrame.Angles(clingAngle, 0, 0) end
-		if bones.backleg then bones.backleg.CFrame = base.backleg * CFrame.Angles(-clingAngle, 0, 0) end
-		if bones.R_backleg then bones.R_backleg.CFrame = base.R_backleg * CFrame.Angles(-clingAngle, 0, 0) end
-		if bones.hips then bones.hips.CFrame = base.hips end
+		if profile.carry then profile.carry(state) end
 		return
 	end
 	local velocity = state.hrp.AssemblyLinearVelocity
@@ -195,21 +278,11 @@ local function animateKoala(state, dt)
 	local targetSpeed = isMoving and 1 or 0
 	state.currentSpeed = state.currentSpeed + (targetSpeed - state.currentSpeed) * 0.2 
 	state.animTime = state.animTime + dt * WALK_SPEED * state.currentSpeed
-	
+
 	local waddleRad = math.rad(WADDLE_SWING) * state.currentSpeed
-	local bones = state.bones
-	local base = state.baseRotations
-	if bones.hips then
-		local waddleAngle = math.sin(state.animTime * WADDLE_SPEED / WALK_SPEED) * waddleRad
-		local bounce = math.abs(math.sin(state.animTime * WADDLE_SPEED / WALK_SPEED * 2)) * 0.1 * state.currentSpeed
-		bones.hips.CFrame = base.hips * CFrame.new(0, bounce, 0) * CFrame.Angles(0, 0, waddleAngle)
+	if profile.animate then
+		profile.animate(state, dt, speed, waddleRad)
 	end
-	local legAngle = math.sin(state.animTime * WADDLE_SPEED / WALK_SPEED) * math.rad(20) * state.currentSpeed
-	if bones.frontleg then bones.frontleg.CFrame = base.frontleg * CFrame.Angles(legAngle, 0, 0) end
-	if bones.R_frontleg then bones.R_frontleg.CFrame = base.R_frontleg * CFrame.Angles(-legAngle, 0, 0) end
-	if bones.backleg then bones.backleg.CFrame = base.backleg * CFrame.Angles(-legAngle, 0, 0) end
-	if bones.R_backleg then bones.R_backleg.CFrame = base.R_backleg * CFrame.Angles(legAngle, 0, 0) end
-	if bones.head then bones.head.CFrame = base.head * CFrame.Angles(math.rad(speed * 2), 0, 0) end
 end
 
 local function updateWander(state, dt)
@@ -325,7 +398,7 @@ local function updateWander(state, dt)
 				state.state = "wandering"
 			end
 		end
-		
+
 		-- RANDOM SLEEPY BUBBLES (Signal-Based)
 		if state.state == "idle" and math.random() < 0.005 then
 			local sleepySignal = signals and signals:FindFirstChild("SleepyEffect")
@@ -368,10 +441,16 @@ local function findKoalas()
 	return inWorkspace
 end
 
+function KoalaSystem.InitKoala(koala)
+	if not koalaStates[koala] then
+		initKoala(koala)
+	end
+end
+
 function KoalaSystem.Initialize()
 	signals = ServerStorage:WaitForChild("Signals")
 	local scanTimer = 0
-	
+
 	RunService.Heartbeat:Connect(function(dt)
 		scanTimer = scanTimer + dt
 		if scanTimer >= 2 then
@@ -382,10 +461,13 @@ function KoalaSystem.Initialize()
 				end
 			end
 		end
-		
+
 		for koala, state in pairs(koalaStates) do
 			if koala.Parent then
 				if state == "failed" then continue end
+
+				-- ALWAYS animate koala so head, hips, and limbs maintain their pristine quadruped posture in all states!
+				animateKoala(state, dt)
 
 				if not koala:GetAttribute("AI_Disabled") then
 					-- Self-Healing: Ensure parts are unanchored if AI is active AND not climbing
@@ -397,9 +479,8 @@ function KoalaSystem.Initialize()
 						end
 					end
 
-					animateKoala(state, dt)
 					updateWander(state, dt)
-					
+
 					-- Safety Grounding: Ensure they don't float if they get bumped
 					if not state.isClimbing and not koala:GetAttribute("IsBeingCarried") then
 						local rayOrigin = state.hrp.Position
@@ -414,15 +495,13 @@ function KoalaSystem.Initialize()
 							state.humanoid:ChangeState(Enum.HumanoidStateType.FallingDown)
 						end
 					end
-				elseif koala:GetAttribute("IsBeingCarried") then
-					animateKoala(state, dt)
 				end
 			else
 				koalaStates[koala] = nil
 			end
 		end
 	end)
-	
+
 	print("[KoalaSystem] Initialized.")
 end
 

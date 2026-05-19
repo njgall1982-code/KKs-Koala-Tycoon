@@ -121,7 +121,7 @@ inspectKoalaRemote.OnClientEvent:Connect(function(koala)
     local maxAge = koala:GetAttribute("StageMax") or 1
     local stageName = koala:GetAttribute("StageName") or "Newborn"
     local isAdult = koala:GetAttribute("IsAdult") or false
-    local gStatus = koala:GetAttribute("GrowthStatus") or "🐌 Growing Slow"
+    local gStatus = koala:GetAttribute("GrowthStatus") or "🐌 Growing Slow (Needs an adult!)"
 
     local growthLabel = Instance.new("TextLabel", frame)
     growthLabel.Size = UDim2.new(1, 0, 0.15, 0)
@@ -137,7 +137,7 @@ inspectKoalaRemote.OnClientEvent:Connect(function(koala)
     statusLabel.Size = UDim2.new(1, 0, 0.1, 0)
     statusLabel.Position = UDim2.new(0, 0, 0.4, 0)
     statusLabel.Text = gStatus
-    statusLabel.TextColor3 = Color3.new(1, 1, 1)
+    statusLabel.TextColor3 = gStatus:find("Boosted") and Color3.new(1, 1, 0.4) or Color3.fromRGB(180, 255, 180)
     statusLabel.Font = Enum.Font.GothamBold
     statusLabel.TextSize = 12
     statusLabel.BackgroundTransparency = 1

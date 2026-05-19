@@ -96,5 +96,5 @@ purchaseEvent.OnClientEvent:Connect(function(success, toolName, message)
     end
 end)
 
--- Listen for open shop requests from server
+-- openShopEvent listener handles opening shop from server
 openShopEvent.OnClientEvent:Connect(openShop)

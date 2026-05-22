@@ -4,6 +4,8 @@
 local ForestDataService = {}
 
 local DataStoreService = game:GetService("DataStoreService")
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
 local PlayerData = DataStoreService:GetDataStore("KKsKoalaTycoonData_v1")
 
 local sessionData = {} -- player.UserId -> Full player data table
@@ -19,8 +21,13 @@ function ForestDataService.LoadData(player)
     
     if success and result then
         sessionData[player.UserId] = result
-        player:SetAttribute("MilkBottles", result.MilkBottles or 0)
-        player:SetAttribute("RescuedKoalas", result.RescuedKoalas or {})
+        local bottles = result.MilkBottles or 0
+        if RunService:IsStudio() and bottles <= 0 then
+            bottles = 5
+            print(string.format("[ForestDataService] 🛠️ Studio Mode: Granted 5 fallback Milk Bottles to %s for testing.", player.Name))
+        end
+        player:SetAttribute("MilkBottles", bottles)
+        player:SetAttribute("RescuedKoalas", HttpService:JSONEncode(result.RescuedKoalas or {}))
         
         -- Establish basic leaderstats to show cash/conservation in UI
         local leaderstats = player:FindFirstChild("leaderstats") or Instance.new("Folder", player)
@@ -32,7 +39,7 @@ function ForestDataService.LoadData(player)
         cons.Name = "Conservation"
         cons.Value = result.Conservation or 0
         
-        print(string.format("[ForestDataService] ✅ Loaded data for %s. Cash: %d, Bottles: %d", player.Name, cash.Value, result.MilkBottles or 0))
+        print(string.format("[ForestDataService] ✅ Loaded data for %s. Cash: %d, Bottles: %d", player.Name, cash.Value, bottles))
     else
         -- Fallback default table so we don't write nil values later
         sessionData[player.UserId] = {
@@ -46,8 +53,13 @@ function ForestDataService.LoadData(player)
             MilkBottles = 0,
             RescuedKoalas = {}
         }
-        player:SetAttribute("MilkBottles", 0)
-        player:SetAttribute("RescuedKoalas", {})
+        local bottles = 0
+        if RunService:IsStudio() then
+            bottles = 5
+            print(string.format("[ForestDataService] 🛠️ Studio Mode: Granted 5 fallback Milk Bottles to %s for testing (No Datastore data).", player.Name))
+        end
+        player:SetAttribute("MilkBottles", bottles)
+        player:SetAttribute("RescuedKoalas", "[]")
         warn("[ForestDataService] ⚠️ No data found or failed to load. Using defaults.")
     end
     player:SetAttribute("DataLoaded", true)
@@ -59,7 +71,12 @@ function ForestDataService.SaveData(player)
     
     -- Sync updated values from the forest session
     data.MilkBottles = player:GetAttribute("MilkBottles") or 0
-    data.RescuedKoalas = player:GetAttribute("RescuedKoalas") or {}
+    local rescuedAttr = player:GetAttribute("RescuedKoalas") or "[]"
+    local decoded = {}
+    pcall(function()
+        decoded = HttpService:JSONDecode(rescuedAttr)
+    end)
+    data.RescuedKoalas = decoded
     
     local leaderstats = player:FindFirstChild("leaderstats")
     if leaderstats then
@@ -104,7 +121,12 @@ function ForestDataService.SyncMilkBottlesToBackpack(player)
     
     local targetCount = player:GetAttribute("MilkBottles") or 0
     local ServerStorage = game:GetService("ServerStorage")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local bottleTemplate = ServerStorage:FindFirstChild("MilkBottle")
+    if not bottleTemplate then
+        local forestFolder = ReplicatedStorage:FindFirstChild("Forest")
+        bottleTemplate = forestFolder and forestFolder:FindFirstChild("MilkBottle")
+    end
     
     if bottleTemplate then
         if currentCount < targetCount then

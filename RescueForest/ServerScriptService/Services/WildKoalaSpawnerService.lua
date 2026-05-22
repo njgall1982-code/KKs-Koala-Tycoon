@@ -43,6 +43,13 @@ end
 local function getJoeyTemplate()
     local folder = ServerStorage:FindFirstChild("Koalas to pick from") or ServerStorage
     local template = folder:FindFirstChild("Koala Baby")
+    if not template then
+        local prototypes = ServerStorage:FindFirstChild("Prototypes")
+        template = prototypes and prototypes:FindFirstChild("WildJoey")
+    end
+    if not template then
+        template = ServerStorage:FindFirstChild("WildJoey")
+    end
     if template then
         return template
     end
@@ -67,8 +74,60 @@ local function getJoeyTemplate()
     return fallback
 end
 
+local function setupJoeyInteraction(joey)
+    -- Tag it so it counts towards the limit
+    if not CollectionService:HasTag(joey, "WildJoey") then
+        CollectionService:AddTag(joey, "WildJoey")
+    end
+    
+    -- Find or create ProximityPrompt
+    local promptPart = joey.PrimaryPart or joey:FindFirstChild("HumanoidRootPart") or joey:FindFirstChildOfClass("Part")
+    if promptPart then
+        local prompt = promptPart:FindFirstChildOfClass("ProximityPrompt")
+        if not prompt then
+            prompt = Instance.new("ProximityPrompt")
+            prompt.Name = "RescuePrompt"
+            prompt.Parent = promptPart
+        end
+        
+        -- Configure the prompt to be consistent
+        prompt.ActionText = "Feed Milk Bottle 🍼"
+        prompt.ObjectText = "Wild Joey"
+        prompt.HoldDuration = 0
+        prompt.RequiresLineOfSight = false
+        prompt.Enabled = true
+        
+        -- Connect to RescueService.RescueJoey
+        prompt.Triggered:Connect(function(player)
+            local path = ServerScriptService:FindFirstChild("RescueForest_Services", true) or ServerScriptService:FindFirstChild("Services")
+            local RescueService = path and path:FindFirstChild("RescueService") and require(path.RescueService)
+            if RescueService then
+                RescueService.RescueJoey(player, joey)
+            else
+                warn("[WildKoalaSpawnerService] RescueService not found!")
+            end
+        end)
+    end
+end
+
 function WildKoalaSpawnerService.Initialize()
-    -- Start spawn loop
+    -- 1. Hook up all pre-placed joeys in workspace
+    for _, child in ipairs(workspace:GetChildren()) do
+        if child.Name == "WildJoey" and child:IsA("Model") then
+            setupJoeyInteraction(child)
+            print("[WildKoalaSpawnerService] Hooked up pre-placed Joey: " .. child:GetFullName())
+        end
+    end
+
+    -- 2. Hook up any future joeys added to workspace
+    workspace.ChildAdded:Connect(function(child)
+        if child.Name == "WildJoey" and child:IsA("Model") then
+            task.wait() -- Wait a frame for descendants to load
+            setupJoeyInteraction(child)
+        end
+    end)
+
+    -- 3. Start spawn loop
     task.spawn(function()
         while true do
             task.wait(5)
@@ -79,14 +138,14 @@ function WildKoalaSpawnerService.Initialize()
         end
     end)
 
-    -- Start wandering loop
+    -- 4. Start wandering loop
     task.spawn(function()
         while true do
             task.wait(math.random(4, 8))
             for _, joey in ipairs(CollectionService:GetTagged("WildJoey")) do
                 local humanoid = joey:FindFirstChildOfClass("Humanoid")
                 local hrp = joey.PrimaryPart or joey:FindFirstChild("HumanoidRootPart")
-                if humanoid and hrp and math.random(1, 100) <= 40 then
+                if humanoid and hrp and not joey:FindFirstChild("WanderScript") and math.random(1, 100) <= 40 then
                     -- Wander to a nearby random spot
                     local offset = Vector3.new(math.random(-15, 15), 0, math.random(-15, 15))
                     local targetPos = hrp.Position + offset
@@ -105,29 +164,9 @@ function WildKoalaSpawnerService.SpawnJoey()
     
     local joey = template:Clone()
     joey.Name = "WildJoey"
-    CollectionService:AddTag(joey, "WildJoey")
     
-    -- Setup Proximity Prompt
-    local promptPart = joey.PrimaryPart or joey:FindFirstChild("HumanoidRootPart") or joey:FindFirstChildOfClass("Part")
-    if promptPart then
-        local prompt = Instance.new("ProximityPrompt")
-        prompt.Name = "RescuePrompt"
-        prompt.ActionText = "Feed Milk Bottle 🍼"
-        prompt.ObjectText = "Wild Joey"
-        prompt.HoldDuration = 0
-        prompt.RequiresLineOfSight = false
-        prompt.Parent = promptPart
-        
-        prompt.Triggered:Connect(function(player)
-            local path = ServerScriptService:FindFirstChild("RescueForest_Services", true) or ServerScriptService:FindFirstChild("Services")
-            local RescueService = path and path:FindFirstChild("RescueService") and require(path.RescueService)
-            if RescueService then
-                RescueService.RescueJoey(player, joey)
-            else
-                warn("[WildKoalaSpawnerService] RescueService not found!")
-            end
-        end)
-    end
+    -- Hook up prompt & tag
+    setupJoeyInteraction(joey)
     
     joey.Parent = workspace
     joey:PivotTo(CFrame.new(spawnPos))

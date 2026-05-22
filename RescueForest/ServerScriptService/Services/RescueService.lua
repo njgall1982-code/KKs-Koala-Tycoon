@@ -6,6 +6,7 @@ local RescueService = {}
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
+local HttpService = game:GetService("HttpService")
 
 local KoalaConfig = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("KoalaConfig"))
 
@@ -74,79 +75,107 @@ function RescueService.RescueJoey(player, joeyInstance)
     local koalaName = KoalaConfig.GetRandomName()
 
     -- Add to RescuedKoalas pending queue
-    local rescuedList = player:GetAttribute("RescuedKoalas") or {}
+    local rescuedListJson = player:GetAttribute("RescuedKoalas") or "[]"
+    local rescuedList = {}
+    pcall(function()
+        rescuedList = HttpService:JSONDecode(rescuedListJson)
+    end)
     table.insert(rescuedList, {
         Name = "Koala",
         DisplayName = koalaName,
         Rarity = rarityName,
         Age = 0
     })
-    player:SetAttribute("RescuedKoalas", rescuedList)
+    player:SetAttribute("RescuedKoalas", HttpService:JSONEncode(rescuedList))
 
     -- Destroy wild Joey in forest
     joeyInstance:Destroy()
 
     -- Visually place a loaded TransferCrate tool in the player's backpack in the forest
-    local transferCrateTemplate = ServerStorage:FindFirstChild("TransferCrate")
-    local folder = ServerStorage:FindFirstChild("Koalas to pick from") or ServerStorage
-    local koalaTemplate = folder:FindFirstChild("Koala Baby")
+    local transferCrateTemplate = ServerStorage:FindFirstChild("CratedKoala")
+    if not transferCrateTemplate then
+        local prototypes = ServerStorage:FindFirstChild("Prototypes")
+        transferCrateTemplate = prototypes and prototypes:FindFirstChild("CratedKoala")
+    end
+    if not transferCrateTemplate then
+        transferCrateTemplate = ServerStorage:FindFirstChild("TransferCrate")
+    end
+
+    local koalaTemplate = ServerStorage:FindFirstChild("WildJoey")
+    if not koalaTemplate then
+        local prototypes = ServerStorage:FindFirstChild("Prototypes")
+        koalaTemplate = prototypes and prototypes:FindFirstChild("WildJoey")
+    end
+    if not koalaTemplate then
+        koalaTemplate = ServerStorage:FindFirstChild("Koala Baby")
+    end
+    if not koalaTemplate then
+        local pickFolder = ServerStorage:FindFirstChild("Koalas to pick from")
+        koalaTemplate = pickFolder and pickFolder:FindFirstChild("Koala Baby")
+    end
     
-    if transferCrateTemplate and koalaTemplate then
+    if transferCrateTemplate then
         task.spawn(function()
             local backpack = player:FindFirstChild("Backpack")
             if backpack then
                 local crate = transferCrateTemplate:Clone()
                 crate.Parent = backpack
                 
-                local koala = koalaTemplate:Clone()
-                koala.Name = "Koala"
-                koala:SetAttribute("DisplayName", koalaName)
-                koala:SetAttribute("Rarity", rarityName)
-                koala:SetAttribute("Age", 0)
-                
-                -- Anchor initially to prevent physics glitches
-                koala:SetAttribute("AI_Disabled", true)
-                for _, p in pairs(koala:GetDescendants()) do
-                    if p:IsA("BasePart") then p.Anchored = true end
-                end
-                
-                local CollectionService = game:GetService("CollectionService")
-                CollectionService:AddTag(koala, "KoalaNPC")
-                koala.Parent = workspace
-                
-                task.wait(0.1) -- Wait a frame
-                
-                local handle = crate:FindFirstChild("Handle")
-                if handle then
-                    local targetRoot = koala:FindFirstChild("HumanoidRootPart") or koala:FindFirstChildOfClass("Part")
-                    if targetRoot then
-                        local weldTarget = handle:FindFirstChild("KoalaPos") or handle
-                        koala:PivotTo(weldTarget.CFrame)
-                        
-                        for _, p in pairs(koala:GetDescendants()) do
-                            if p:IsA("BasePart") then
-                                p.CanCollide = false
-                                p.Massless = true
-                                p.Anchored = false
-                            end
-                        end
-                        
-                        local weld = Instance.new("WeldConstraint")
-                        weld.Name = "CarryWeld"
-                        weld.Part0 = weldTarget
-                        weld.Part1 = targetRoot
-                        weld.Parent = targetRoot
-                        koala.Parent = crate
-                        
-                        local hum = koala:FindFirstChildOfClass("Humanoid")
-                        if hum then hum.PlatformStand = true end
-                        
-                        koala:SetAttribute("IsBeingCarried", true)
-                        player:SetAttribute("Carrying", koala.Name)
+                if koalaTemplate then
+                    local koala = koalaTemplate:Clone()
+                    koala.Name = "Koala"
+                    koala:SetAttribute("DisplayName", koalaName)
+                    koala:SetAttribute("Rarity", rarityName)
+                    koala:SetAttribute("Age", 0)
+                    
+                    -- Anchor initially to prevent physics glitches
+                    koala:SetAttribute("AI_Disabled", true)
+                    for _, p in pairs(koala:GetDescendants()) do
+                        if p:IsA("BasePart") then p.Anchored = true end
                     end
+                    
+                    local CollectionService = game:GetService("CollectionService")
+                    CollectionService:AddTag(koala, "KoalaNPC")
+                    koala.Parent = workspace
+                    
+                    task.wait(0.1) -- Wait a frame
+                    
+                    local handle = crate:FindFirstChild("Handle")
+                    if handle then
+                        local targetRoot = koala:FindFirstChild("HumanoidRootPart") or koala:FindFirstChildOfClass("Part")
+                        if targetRoot then
+                            local weldTarget = handle:FindFirstChild("KoalaPos") or handle
+                            koala:PivotTo(weldTarget.CFrame)
+                            
+                            for _, p in pairs(koala:GetDescendants()) do
+                                if p:IsA("BasePart") then
+                                    p.CanCollide = false
+                                    p.Massless = true
+                                    p.Anchored = false
+                                end
+                            end
+                            
+                            local weld = Instance.new("WeldConstraint")
+                            weld.Name = "CarryWeld"
+                            weld.Part0 = weldTarget
+                            weld.Part1 = targetRoot
+                            weld.Parent = targetRoot
+                            koala.Parent = crate
+                            
+                            local hum = koala:FindFirstChildOfClass("Humanoid")
+                            if hum then hum.PlatformStand = true end
+                            
+                            koala:SetAttribute("IsBeingCarried", true)
+                            player:SetAttribute("Carrying", koala.Name)
+                        end
+                    end
+                else
+                    warn("[RescueService] koalaTemplate (WildJoey / Koala Baby) not found, spawning empty crate.")
                 end
             end
         end)
+    else
+        warn("[RescueService] transferCrateTemplate (CratedKoala / TransferCrate) not found.")
     end
 
     -- Trigger immediate save to make it secure

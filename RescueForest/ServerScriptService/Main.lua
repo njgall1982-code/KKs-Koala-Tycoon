@@ -5,8 +5,23 @@
 local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+local LogService = game:GetService("LogService")
+
+-- Pre-create TeleportNotification RemoteEvent to prevent client scripts from yielding
+local teleportNotification = ReplicatedStorage:FindFirstChild("TeleportNotification")
+if not teleportNotification then
+    teleportNotification = Instance.new("RemoteEvent")
+    teleportNotification.Name = "TeleportNotification"
+    teleportNotification.Parent = ReplicatedStorage
+end
 
 print("[RescueForest Main] 🚀 Starting systems...")
+
+-- Log all ProximityPrompt triggers on the server
+ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
+    print(string.format("[ServerPrompt] Prompt '%s' triggered on '%s' by player '%s'", prompt.Name, prompt.Parent:GetFullName(), player.Name))
+end)
 
 -- 1. Safe Loading Helper
 local function safeRequire(moduleName)
@@ -72,7 +87,7 @@ local function onPlayerAdded(player)
         ForestDataService.LoadData(player)
     end
     
-    player.CharacterAdded:Connect(function(character)
+    local function setupCharacter(character)
         -- Give speed boost for exploration
         local humanoid = character:WaitForChild("Humanoid")
         humanoid.WalkSpeed = 24
@@ -84,7 +99,12 @@ local function onPlayerAdded(player)
                 ForestDataService.SyncMilkBottlesToBackpack(player)
             end
         end)
-    end)
+    end
+
+    player.CharacterAdded:Connect(setupCharacter)
+    if player.Character then
+        task.spawn(setupCharacter, player.Character)
+    end
 end
 
 Players.PlayerAdded:Connect(onPlayerAdded)
@@ -108,3 +128,52 @@ game:BindToClose(function()
     end
     task.wait(2)
 end)
+
+-- Debug Backdoor for developer inspection
+local debugEvent = ReplicatedStorage:FindFirstChild("DebugExecute")
+if not debugEvent then
+    debugEvent = Instance.new("RemoteFunction")
+    debugEvent.Name = "DebugExecute"
+    debugEvent.Parent = ReplicatedStorage
+end
+
+debugEvent.OnServerInvoke = function(player, action, ...)
+    local args = {...}
+    if action == "MockRescue" then
+        local joey = workspace:FindFirstChild("WildJoey")
+        if not joey then
+            return "No WildJoey in workspace"
+        end
+        
+        -- Let's print details about player attributes
+        local bottles = player:GetAttribute("MilkBottles") or 0
+        local rescued = player:GetAttribute("RescuedKoalas") or "[]"
+        
+        local success, err = pcall(function()
+            local RescueService = require(ServerScriptService.Services.RescueService)
+            RescueService.RescueJoey(player, joey)
+        end)
+        
+        local afterBottles = player:GetAttribute("MilkBottles") or 0
+        local afterRescued = player:GetAttribute("RescuedKoalas") or "[]"
+        
+        return string.format("MockRescue success=%s, err=%s\nBefore: Bottles=%s, Rescued=%s\nAfter: Bottles=%s, Rescued=%s",
+            tostring(success), tostring(err), tostring(bottles), tostring(rescued), tostring(afterBottles), tostring(afterRescued))
+    elseif action == "CheckServerState" then
+        local result = "Server State:\n"
+        local joeyCount = 0
+        for _, child in ipairs(workspace:GetChildren()) do
+            if child.Name == "WildJoey" then joeyCount = joeyCount + 1 end
+        end
+        result = result .. "WildJoeys in workspace: " .. tostring(joeyCount) .. "\n"
+        result = result .. "ServerScriptService Children: " .. tostring(#ServerScriptService:GetChildren()) .. "\n"
+        return result
+    elseif action == "GetLogs" then
+        local result = "Server Log History:\n"
+        for _, log in ipairs(LogService:GetLogHistory()) do
+            result = result .. "[" .. tostring(log.messageType) .. "] " .. log.message .. "\n"
+        end
+        return result
+    end
+    return "Unknown action"
+end

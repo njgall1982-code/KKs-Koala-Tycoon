@@ -4,6 +4,14 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local ServerStorage = game:GetService("ServerStorage")
 local RunService = game:GetService("RunService")
 
+-- Pre-create TeleportNotification RemoteEvent to prevent client scripts from yielding
+local teleportNotification = ReplicatedStorage:FindFirstChild("TeleportNotification")
+if not teleportNotification then
+	teleportNotification = Instance.new("RemoteEvent")
+	teleportNotification.Name = "TeleportNotification"
+	teleportNotification.Parent = ReplicatedStorage
+end
+
 -- 1. Load Validation Service First
 local ValidationService = require(ServerScriptService.Services.ValidationService)
 ValidationService.RunChecks()
@@ -115,7 +123,7 @@ local function onPlayerAdded(player)
 		DataStoreModule.LoadData(player)
 	end
 
-	player.CharacterAdded:Connect(function(character)
+	local function setupCharacter(character)
 		-- Give Starter Hammer
 		local hammerTemplate = ServerStorage:FindFirstChild("WoodenHammer")
 		if hammerTemplate then
@@ -164,7 +172,12 @@ local function onPlayerAdded(player)
 			-- Send Welcome Message
 			signals.UpdateQuest:Fire(player, "👋 Welcome! Repair Exhibit 1 🔨 then talk to the Head Vet 👨‍⚕️")
 		end)
-	end)
+	end
+
+	player.CharacterAdded:Connect(setupCharacter)
+	if player.Character then
+		task.spawn(setupCharacter, player.Character)
+	end
 end
 
 Players.PlayerAdded:Connect(onPlayerAdded)

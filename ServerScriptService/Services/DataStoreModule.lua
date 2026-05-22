@@ -1,6 +1,7 @@
 -- [VERSION 2.0 - SIMPLIFIED TYCOON]
 local Players = game:GetService("Players")
 local DataStoreService = game:GetService("DataStoreService")
+local HttpService = game:GetService("HttpService")
 local PlayerData = DataStoreService:GetDataStore("KKsKoalaTycoonData_v1")
 
 local DataStore = {}
@@ -9,6 +10,12 @@ function DataStore.SaveData(player)
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if not leaderstats then return end
 
+	local rescuedAttr = player:GetAttribute("RescuedKoalas") or "[]"
+	local rescuedDecoded = {}
+	pcall(function()
+		rescuedDecoded = HttpService:JSONDecode(rescuedAttr)
+	end)
+
 	local data = {
 		Cash = leaderstats.Cash.Value,
 		Conservation = leaderstats.Conservation.Value,
@@ -16,7 +23,7 @@ function DataStore.SaveData(player)
 		LeafCount = player:GetAttribute("LeafCount") or 0,
 		OwnedTools = {},
 		MilkBottles = player:GetAttribute("MilkBottles") or 0,
-		RescuedKoalas = player:GetAttribute("RescuedKoalas") or {}
+		RescuedKoalas = rescuedDecoded
 	}
 
 	local ownedTools = player:FindFirstChild("OwnedTools")
@@ -99,7 +106,7 @@ function DataStore.LoadData(player)
 		he.Value = result.HasExhibit or false
 		player:SetAttribute("LeafCount", result.LeafCount or 0)
 		player:SetAttribute("MilkBottles", result.MilkBottles or 0)
-		player:SetAttribute("RescuedKoalas", result.RescuedKoalas or {})
+		player:SetAttribute("RescuedKoalas", HttpService:JSONEncode(result.RescuedKoalas or {}))
 
 		-- Give Milk Bottles
 		local bottleTemplate = game:GetService("ServerStorage"):FindFirstChild("MilkBottle")
@@ -173,7 +180,7 @@ function DataStore.LoadData(player)
 				warn("[DataStore] ❌ TransferCrate template not found in ServerStorage!")
 			end
 			-- Clear them out on the player instance so they don't save/spawn again
-			player:SetAttribute("RescuedKoalas", {})
+			player:SetAttribute("RescuedKoalas", "[]")
 		end
 
 		if result.OwnedTools then
@@ -268,7 +275,7 @@ function DataStore.LoadData(player)
 		he.Value = false
 		player:SetAttribute("LeafCount", 0)
 		player:SetAttribute("MilkBottles", 0)
-		player:SetAttribute("RescuedKoalas", {})
+		player:SetAttribute("RescuedKoalas", "[]")
 	end
 
 	player:SetAttribute("DataLoaded", true)

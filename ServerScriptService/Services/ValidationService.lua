@@ -31,8 +31,19 @@ function ValidationService.RunChecks()
 	-- Check ServerStorage Assets
 	check(ServerStorage, "DevWand", "Tool")
 	check(ServerStorage, "WoodenHammer", "Tool")
-	check(ServerStorage, "Koala", "Model")
 	check(ServerStorage, "NewKK", "Model")
+	
+	-- Check Koala templates folder and models
+	local koalasFolder = ServerStorage:FindFirstChild("Koalas to pick from")
+	if koalasFolder then
+		check(koalasFolder, "Koala Baby", "Model")
+		check(koalasFolder, "Koala 1 year old", "Model")
+		check(koalasFolder, "Koala 2 year old", "Model")
+		check(koalasFolder, "Koala", "Model")
+	else
+		warn("[Validation] ❌ MISSING: ServerStorage.Koalas to pick from")
+		errors += 1
+	end
 	
 	-- Check Templates
 	local template = ServerStorage:FindFirstChild("Template")

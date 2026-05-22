@@ -14,7 +14,9 @@ function DataStore.SaveData(player)
 		Conservation = leaderstats.Conservation.Value,
 		HasExhibit = player:FindFirstChild("HasExhibit") and player.HasExhibit.Value or false,
 		LeafCount = player:GetAttribute("LeafCount") or 0,
-		OwnedTools = {}
+		OwnedTools = {},
+		MilkBottles = player:GetAttribute("MilkBottles") or 0,
+		RescuedKoalas = player:GetAttribute("RescuedKoalas") or {}
 	}
 
 	local ownedTools = player:FindFirstChild("OwnedTools")
@@ -96,6 +98,83 @@ function DataStore.LoadData(player)
 		cons.Value = result.Conservation or 0
 		he.Value = result.HasExhibit or false
 		player:SetAttribute("LeafCount", result.LeafCount or 0)
+		player:SetAttribute("MilkBottles", result.MilkBottles or 0)
+		player:SetAttribute("RescuedKoalas", result.RescuedKoalas or {})
+
+		-- Give Milk Bottles
+		local bottleTemplate = game:GetService("ServerStorage"):FindFirstChild("MilkBottle")
+		local bottleCount = result.MilkBottles or 0
+		if bottleTemplate and bottleCount > 0 then
+			task.spawn(function()
+				local backpack = player:WaitForChild("Backpack", 5)
+				if backpack then
+					for i = 1, bottleCount do
+						bottleTemplate:Clone().Parent = backpack
+					end
+				end
+			end)
+		end
+
+		-- Spawn Rescued Koalas in Transfer Crates (Tools)
+		local rescued = result.RescuedKoalas or {}
+		if #rescued > 0 then
+			print("[DataStore] 📦 Found " .. #rescued .. " rescued koalas pending delivery!")
+			local ServerStorage = game:GetService("ServerStorage")
+			local transferCrateTemplate = ServerStorage:FindFirstChild("TransferCrate")
+			
+			if transferCrateTemplate then
+				task.spawn(function()
+					task.wait(3) -- Wait for tycoon to initialize and character to load
+					local backpack = player:WaitForChild("Backpack", 5)
+					if not backpack then return end
+					
+					local KoalaLifecycle = require(game:GetService("ServerScriptService").Modules.KoalaLifecycle)
+					local CarryService = require(game:GetService("ServerScriptService").Services.CarryService)
+					local CollectionService = game:GetService("CollectionService")
+					local folder = ServerStorage:FindFirstChild("Koalas to pick from") or ServerStorage
+					local template = folder:FindFirstChild("Koala Baby")
+
+					for _, kData in ipairs(rescued) do
+						local crate = transferCrateTemplate:Clone()
+						crate.Parent = backpack
+						
+						if template then
+							local koala = template:Clone()
+							koala.Name = kData.Name or "Koala"
+							koala:SetAttribute("DisplayName", kData.DisplayName or "Wild Koala")
+							
+							-- Anchor initially to prevent physics glitches
+							koala:SetAttribute("AI_Disabled", true)
+							for _, p in pairs(koala:GetDescendants()) do
+								if p:IsA("BasePart") then p.Anchored = true end
+							end
+							
+							CollectionService:AddTag(koala, "KoalaNPC")
+							koala.Parent = workspace
+							
+							-- Initialize the stats (rarity, age=0)
+							KoalaLifecycle.InitKoala(koala, kData.Rarity or "Cute", kData.Age or 0)
+							
+							task.wait(0.1) -- Small stabilization delay
+							
+							-- Weld inside the crate
+							local handle = crate:FindFirstChild("Handle")
+							if handle then
+								local weldTarget = handle:FindFirstChild("KoalaPos") or handle
+								CarryService.PickUp(player, koala, weldTarget)
+							end
+							print("[DataStore] 📦 Loaded and welded " .. koala:GetAttribute("DisplayName") .. " (" .. (kData.Rarity or "Cute") .. ") into player's TransferCrate tool!")
+						else
+							warn("[DataStore] ❌ Koala Baby template missing. Cannot weld inside TransferCrate.")
+						end
+					end
+				end)
+			else
+				warn("[DataStore] ❌ TransferCrate template not found in ServerStorage!")
+			end
+			-- Clear them out on the player instance so they don't save/spawn again
+			player:SetAttribute("RescuedKoalas", {})
+		end
 
 		if result.OwnedTools then
 			for _, toolName in ipairs(result.OwnedTools) do
@@ -188,6 +267,8 @@ function DataStore.LoadData(player)
 		cons.Value = 0
 		he.Value = false
 		player:SetAttribute("LeafCount", 0)
+		player:SetAttribute("MilkBottles", 0)
+		player:SetAttribute("RescuedKoalas", {})
 	end
 
 	player:SetAttribute("DataLoaded", true)

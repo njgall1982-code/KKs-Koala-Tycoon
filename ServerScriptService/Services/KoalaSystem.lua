@@ -84,9 +84,70 @@ local function initKoala(koala)
 			part.CanQuery = true 
 		end
 	end
+
+	-- Temporarily anchor all parts to prevent physics simulation or gravity separation during weld setup
+	local originallyAnchored = {}
+	for _, p in ipairs(koala:GetDescendants()) do
+		if p:IsA("BasePart") then
+			originallyAnchored[p] = p.Anchored
+			p.Anchored = true
+		end
+	end
+
+	-- Ensure HumanoidRootPart is welded to the rigRoot (visual mesh) to prevent falling apart/through ground
+	-- We replace any WeldConstraint with a regular Weld so we can animate its C0/C1 transform for waddling
+	local rootWeld = nil
+	for _, descendant in ipairs(koala:GetDescendants()) do
+		if descendant:IsA("WeldConstraint") or descendant:IsA("Weld") or descendant:IsA("Motor6D") then
+			if (descendant.Part0 == hrp and descendant.Part1 == rigRoot) or (descendant.Part0 == rigRoot and descendant.Part1 == hrp) then
+				if descendant:IsA("WeldConstraint") then
+					descendant:Destroy()
+				else
+					rootWeld = descendant
+				end
+			end
+		end
+	end
+
+	if not rootWeld then
+		rootWeld = Instance.new("Weld")
+		rootWeld.Name = "RigRootWeld"
+		rootWeld.Part0 = hrp
+		rootWeld.Part1 = rigRoot
+		rootWeld.C0 = hrp.CFrame:ToObjectSpace(rigRoot.CFrame)
+		rootWeld.C1 = CFrame.new()
+		rootWeld.Parent = hrp
+	else
+		-- Normalize weld setup to ensure Part0 is hrp, Part1 is rigRoot, and C1 is identity
+		rootWeld.Part0 = hrp
+		rootWeld.Part1 = rigRoot
+		rootWeld.C0 = hrp.CFrame:ToObjectSpace(rigRoot.CFrame)
+		rootWeld.C1 = CFrame.new()
+	end
+
+	-- Restore original anchored states
+	for p, wasAnchored in pairs(originallyAnchored) do
+		if p.Parent then
+			p.Anchored = wasAnchored
+		end
+	end
+
 	humanoid.WalkSpeed = WALK_SPEED
 	humanoid.AutoRotate = true
-	humanoid.HipHeight = 0
+	
+	-- Keep template's non-zero HipHeight if configured, otherwise default to 0
+	if humanoid.HipHeight == 0 then
+		humanoid.HipHeight = 0
+	end
+
+	print(string.format("[KoalaSystem.InitDebug] Koala: %s | DisplayName: %s | HipHeight: %f | HRP.Y: %f | Mesh.Y: %f | Welded: %s",
+		koala.Name,
+		koala:GetAttribute("DisplayName") or "None",
+		humanoid.HipHeight,
+		hrp and hrp.Position.Y or 0,
+		rigRoot and rigRoot.Position.Y or 0,
+		tostring(rootWeld ~= nil)
+	))
 
 	if not koala:GetAttribute("AI_Disabled") then
 		for _, p in ipairs(koala:GetDescendants()) do
@@ -101,6 +162,8 @@ local function initKoala(koala)
 		humanoid = humanoid,
 		hrp = hrp,
 		bones = bones,
+		rootWeld = rootWeld,
+		baseRootWeldC0 = rootWeld and rootWeld.C0 or CFrame.new(),
 		spawnPoint = hrp.Position,
 		targetPoint = nil,
 		idleTimer = math.random(IDLE_TIME_MIN, IDLE_TIME_MAX),
@@ -264,6 +327,9 @@ local function animateKoala(state, dt)
 	local profile = AnimationProfiles[state.rigType] or AnimationProfiles["Biped_Legacy"]
 	if state.koala:GetAttribute("IsBeingCarried") then
 		if profile.carry then profile.carry(state) end
+		if not state.bones.hips and state.rootWeld then
+			state.rootWeld.C0 = state.baseRootWeldC0
+		end
 		return
 	end
 	local velocity = state.hrp.AssemblyLinearVelocity
@@ -282,6 +348,20 @@ local function animateKoala(state, dt)
 	local waddleRad = math.rad(WADDLE_SWING) * state.currentSpeed
 	if profile.animate then
 		profile.animate(state, dt, speed, waddleRad)
+	end
+
+	-- Procedural waddle for boneless rigs (like the Newborn/Baby)
+	if not state.bones.hips and state.rootWeld then
+		local cycle = state.animTime * WADDLE_SPEED / WALK_SPEED
+		local bounce = math.abs(math.sin(cycle * 2)) * 0.08 * state.currentSpeed
+		local sway = math.sin(cycle) * 0.06 * state.currentSpeed
+		local roll = math.sin(cycle) * math.rad(6) * state.currentSpeed
+		local yaw = math.cos(cycle) * math.rad(4) * state.currentSpeed
+		local pitch = (math.sin(cycle * 2) * math.rad(2) + math.rad(2)) * state.currentSpeed
+
+		state.rootWeld.C0 = state.baseRootWeldC0 
+			* CFrame.new(sway, bounce, 0) 
+			* CFrame.Angles(pitch, yaw, roll)
 	end
 end
 
@@ -352,14 +432,14 @@ local function updateWander(state, dt)
 		local baseRotation = CFrame.lookAt(targetPos, lookAt)
 		state.hrp.CFrame = baseRotation * CFrame.Angles(math.rad(90), 0, 0)
 		if state.climbProgress <= 0 then
+			local flatPos = state.hrp.Position
+			state.hrp.CFrame = CFrame.new(flatPos.X, state.originalY, flatPos.Z)
 			state.climbPhase = nil
 			state.isClimbing = false
-			state.humanoid.PlatformStand = false
-			state.hrp.Anchored = false
 			state.hrp.CanCollide = true
 			state.humanoid.AutoRotate = true
-			local flatPos = state.hrp.Position
-			state.koala:PivotTo(CFrame.new(flatPos.X, state.originalY, flatPos.Z))
+			state.humanoid.PlatformStand = false
+			state.hrp.Anchored = false
 			state.humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
 			state.state = "idle"
 			state.idleTimer = math.random(IDLE_TIME_MIN, IDLE_TIME_MAX)

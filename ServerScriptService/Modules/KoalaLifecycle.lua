@@ -130,6 +130,12 @@ function KoalaLifecycle.SwapModel(oldKoala, newStageName)
 	newKoala:SetAttribute("DisplayName", oldName)
 	newKoala:SetAttribute("HasBeenNamed", hasNamed)
 
+	-- Sticky Anchor BEFORE parenting and initializing to prevent falling on first frame
+	newKoala:SetAttribute("AI_Disabled", true)
+	for _, p in pairs(newKoala:GetDescendants()) do
+		if p:IsA("BasePart") then p.Anchored = true end
+	end
+
 	newKoala.Parent = oldKoala.Parent or workspace
 	
 	-- DEBUG: Log before PivotTo
@@ -143,6 +149,16 @@ function KoalaLifecycle.SwapModel(oldKoala, newStageName)
 	-- Init lifecycle stats
 	KoalaLifecycle.InitKoala(newKoala, oldRarity, oldAge)
 	newKoala:SetAttribute("DisplayName", oldName)
+
+	-- Release Sticky Anchor after a short delay
+	task.delay(3, function()
+		if newKoala and newKoala.Parent then
+			newKoala:SetAttribute("AI_Disabled", nil)
+			for _, p in pairs(newKoala:GetDescendants()) do
+				if p:IsA("BasePart") then p.Anchored = false end
+			end
+		end
+	end)
 
 	-- Cleanup
 	oldKoala:Destroy()
@@ -182,6 +198,12 @@ function KoalaLifecycle.RespawnAt(oldKoala, pos, parent)
 	newKoala:SetAttribute("DisplayName", oldName)
 	newKoala:SetAttribute("HasBeenNamed", hasNamed)
 
+	-- Sticky Anchor BEFORE parenting and initializing to prevent falling or exploding on first frame
+	newKoala:SetAttribute("AI_Disabled", true)
+	for _, p in pairs(newKoala:GetDescendants()) do
+		if p:IsA("BasePart") then p.Anchored = true end
+	end
+
 	newKoala.Parent = workspace
 
 	-- Position koala at the spawn point
@@ -205,11 +227,6 @@ function KoalaLifecycle.RespawnAt(oldKoala, pos, parent)
 
 	KoalaLifecycle.InitKoala(newKoala, oldRarity, oldAge)
 
-	-- Sticky Anchor
-	newKoala:SetAttribute("AI_Disabled", true)
-	for _, p in pairs(newKoala:GetDescendants()) do
-		if p:IsA("BasePart") then p.Anchored = true end
-	end
 	task.delay(3, function()
 		if newKoala and newKoala.Parent then
 			newKoala:SetAttribute("AI_Disabled", nil)

@@ -207,7 +207,16 @@ function DevService.Initialize()
 			local ls = player:FindFirstChild("leaderstats")
 			if ls then ls.Cash.Value += 10000 end
 			player:SetAttribute("TutorialComplete", true)
-			TycoonService.UpdateStatus(player, "⚡ Skipped Tutorial!")
+			local ex = workspace:FindFirstChild("TutorialExhibit_Workspace")
+			if ex then
+				ex:SetAttribute("IsRepaired", true)
+				local fence = ex:FindFirstChild("BrokenFence")
+				if fence then
+					fence.Transparency = 0
+					fence.CanCollide = true
+				end
+			end
+			TycoonService.UpdateStatus(player, "⚡ Skipped Tutorial & Repaired Exhibit!")
 		end
 	end)
 end

@@ -109,6 +109,10 @@ function ShopService.HandlePurchaseRequest(player, toolName, price)
 	
     if success then
         awardTool:Fire(player, toolName, not consumable)
+        if toolName == "MilkBottle" then
+            local current = player:GetAttribute("MilkBottles") or 0
+            player:SetAttribute("MilkBottles", current + 1)
+        end
         purchaseEvent:FireClient(player, true, toolName, "Purchase successful!")
     else
         purchaseEvent:FireClient(player, false, toolName, reason or "Insufficient funds!")

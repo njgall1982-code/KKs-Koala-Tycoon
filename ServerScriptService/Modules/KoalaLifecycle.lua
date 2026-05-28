@@ -113,6 +113,7 @@ function KoalaLifecycle.SwapModel(oldKoala, newStageName)
 	local hasNamed   = oldKoala:GetAttribute("HasBeenNamed") or false
 	local homeExhibit = oldKoala:GetAttribute("HomeExhibit")
 	local oldPos     = oldKoala:GetPivot()
+	local oldOutfit  = oldKoala:GetAttribute("EquippedOutfit") or ""
 
 	-- DEBUG: Log before swap
 	print("[KoalaLifecycle.SwapModel] GROWTH DEBUG:")
@@ -150,6 +151,17 @@ function KoalaLifecycle.SwapModel(oldKoala, newStageName)
 	KoalaLifecycle.InitKoala(newKoala, oldRarity, oldAge)
 	newKoala:SetAttribute("DisplayName", oldName)
 
+	-- Re-equip outfit if this is now an adult
+	if oldOutfit ~= "" then
+		local newStage = newKoala:GetAttribute("Stage") or 1
+		if newStage == 4 then
+			local KoalaOutfitService = require(game:GetService("ServerScriptService").Services.KoalaOutfitService)
+			KoalaOutfitService.EquipOutfit(newKoala, oldOutfit)
+		else
+			newKoala:SetAttribute("EquippedOutfit", nil)
+		end
+	end
+
 	-- Release Sticky Anchor after a short delay
 	task.delay(3, function()
 		if newKoala and newKoala.Parent then
@@ -182,6 +194,7 @@ function KoalaLifecycle.RespawnAt(oldKoala, pos, parent)
 	local oldName    = oldKoala:GetAttribute("DisplayName") or oldKoala.Name
 	local hasNamed   = oldKoala:GetAttribute("HasBeenNamed") or false
 	local homeExhibit = parent and parent.Name or oldKoala:GetAttribute("HomeExhibit")
+	local oldOutfit  = oldKoala:GetAttribute("EquippedOutfit") or ""
 
 	if (oldKoala.Name == "KK" or oldName == "Koala") and not hasNamed then
 		oldName = "KK"
@@ -226,6 +239,17 @@ function KoalaLifecycle.RespawnAt(oldKoala, pos, parent)
 	end
 
 	KoalaLifecycle.InitKoala(newKoala, oldRarity, oldAge)
+
+	-- Re-equip outfit if this is an adult
+	if oldOutfit ~= "" then
+		local newStage = newKoala:GetAttribute("Stage") or 1
+		if newStage == 4 then
+			local KoalaOutfitService = require(game:GetService("ServerScriptService").Services.KoalaOutfitService)
+			KoalaOutfitService.EquipOutfit(newKoala, oldOutfit)
+		else
+			newKoala:SetAttribute("EquippedOutfit", nil)
+		end
+	end
 
 	task.delay(3, function()
 		if newKoala and newKoala.Parent then

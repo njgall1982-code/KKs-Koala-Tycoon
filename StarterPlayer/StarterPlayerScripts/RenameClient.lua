@@ -54,6 +54,94 @@ local function createBasePopup(titleText)
     return screenGui, frame
 end
 
+-- OUTFIT SELECTION PANEL
+local function openOutfitSelection(koala, parentInspectGui, parentInspectFrame)
+	if parentInspectFrame then
+		parentInspectFrame.Visible = false
+	end
+
+	local oGui, oFrame = createBasePopup("DRESS UP KOALA")
+	oFrame.Size = UDim2.new(0, 320, 0, 300)
+	oFrame.Position = UDim2.new(0.5, -160, 0.5, -150)
+
+	-- Back Button
+	local backBtn = Instance.new("TextButton", oFrame)
+	backBtn.Size = UDim2.new(0, 30, 0, 30)
+	backBtn.Position = UDim2.new(0, 5, 0, 5)
+	backBtn.Text = "⬅️"
+	backBtn.TextColor3 = Color3.new(1, 1, 1)
+	backBtn.BackgroundTransparency = 1
+	backBtn.Font = Enum.Font.GothamBold
+	backBtn.TextSize = 18
+	backBtn.MouseButton1Click:Connect(function()
+		oGui:Destroy()
+		if parentInspectFrame then
+			parentInspectFrame.Visible = true
+		end
+	end)
+
+	local scroll = Instance.new("ScrollingFrame", oFrame)
+	scroll.Size = UDim2.new(0.9, 0, 0.7, 0)
+	scroll.Position = UDim2.new(0.05, 0, 0.25, 0)
+	scroll.BackgroundTransparency = 1
+	scroll.BorderSizePixel = 0
+	scroll.ScrollBarThickness = 6
+	scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+	local layout = Instance.new("UIListLayout", scroll)
+	layout.Padding = UDim.new(0, 8)
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+	-- Load player's unlocked outfits
+	local unlockedStr = player:GetAttribute("UnlockedOutfits") or "[]"
+	local HttpService = game:GetService("HttpService")
+	local unlocked = {}
+	pcall(function()
+		unlocked = HttpService:JSONDecode(unlockedStr)
+	end)
+
+	local currentOutfit = koala:GetAttribute("EquippedOutfit") or ""
+
+	local function createOutfitOption(name, displayName, isUnequip)
+		local btn = Instance.new("TextButton", scroll)
+		btn.Size = UDim2.new(0.95, 0, 0, 40)
+		btn.Text = displayName
+
+		if (isUnequip and currentOutfit == "") or (not isUnequip and currentOutfit == name) then
+			btn.BackgroundColor3 = Color3.fromRGB(60, 160, 60)
+			btn.Text = displayName .. " (Equipped) ✅"
+		else
+			btn.BackgroundColor3 = Color3.fromRGB(45, 50, 55)
+		end
+
+		btn.TextColor3 = Color3.new(1, 1, 1)
+		btn.Font = Enum.Font.GothamMedium
+		btn.TextSize = 14
+		Instance.new("UICorner", btn)
+
+		local stroke = Instance.new("UIStroke", btn)
+		stroke.Color = Color3.new(1, 1, 1)
+		stroke.Transparency = 0.8
+		stroke.Thickness = 1
+
+		btn.MouseButton1Click:Connect(function()
+			ReplicatedStorage.EquipOutfitRequest:FireServer(koala, isUnequip and "" or name)
+			oGui:Destroy()
+			if parentInspectGui then
+				parentInspectGui:Destroy()
+			end
+		end)
+	end
+
+	createOutfitOption("", "❌ Remove Outfit", true)
+
+	for _, outfitName in ipairs(unlocked) do
+		createOutfitOption(outfitName, outfitName, false)
+	end
+
+	scroll.CanvasSize = UDim2.new(0, 0, 0, (#unlocked + 1) * 48)
+end
+
 -- RENAME EXHIBIT
 renameExhibitRemote.OnClientEvent:Connect(function(exhibitPath)
     local gui, frame = createBasePopup("Rename Exhibit")
@@ -225,21 +313,44 @@ inspectKoalaRemote.OnClientEvent:Connect(function(koala, isModelSwap)
     stats.TextColor3 = (food < 30) and Color3.new(1, 0.4, 0.4) or Color3.new(0.6, 1, 0.6)
     stats.BackgroundTransparency = 1
     
+    local isAdult = koala:GetAttribute("Stage") == 4
+
     local renameBtn = Instance.new("TextButton", frame)
-    renameBtn.Size = UDim2.new(0.7, 0, 0.15, 0)
-    renameBtn.Position = UDim2.new(0.15, 0, 0.78, 0)
-    renameBtn.Text = hasBeenNamed and "Change Name (Tag Req.)" or "Register Name (FREE)"
+    renameBtn.Text = hasBeenNamed and "Change Name (Tag)" or "Register Name (FREE)"
     renameBtn.BackgroundColor3 = hasBeenNamed and Color3.fromRGB(70, 80, 90) or Color3.fromRGB(60, 160, 60)
     renameBtn.TextColor3 = Color3.new(1, 1, 1)
     Instance.new("UICorner", renameBtn)
-    
+
+    if isAdult then
+        -- Side-by-side buttons
+        renameBtn.Size = UDim2.new(0.4, 0, 0.15, 0)
+        renameBtn.Position = UDim2.new(0.08, 0, 0.78, 0)
+
+        local outfitBtn = Instance.new("TextButton", frame)
+        outfitBtn.Size = UDim2.new(0.4, 0, 0.15, 0)
+        outfitBtn.Position = UDim2.new(0.52, 0, 0.78, 0)
+        outfitBtn.Text = "👗 Outfits"
+        outfitBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+        outfitBtn.TextColor3 = Color3.new(1, 1, 1)
+        outfitBtn.Font = Enum.Font.GothamBold
+        outfitBtn.TextSize = 14
+        Instance.new("UICorner", outfitBtn)
+
+        outfitBtn.MouseButton1Click:Connect(function()
+            openOutfitSelection(koala, gui, frame)
+        end)
+    else
+        renameBtn.Size = UDim2.new(0.7, 0, 0.15, 0)
+        renameBtn.Position = UDim2.new(0.15, 0, 0.78, 0)
+    end
+
     renameBtn.MouseButton1Click:Connect(function()
         if hasBeenNamed then
             local tag = player.Backpack:FindFirstChild("RenameTag") or player.Character:FindFirstChild("RenameTag")
             if not tag then
                 renameBtn.Text = "❌ Need a Rename Tag!"
                 task.wait(2)
-                renameBtn.Text = "Change Name (Tag Req.)"
+                renameBtn.Text = hasBeenNamed and "Change Name (Tag)" or "Register Name (FREE)"
                 return
             end
         end
@@ -254,18 +365,32 @@ inspectKoalaRemote.OnClientEvent:Connect(function(koala, isModelSwap)
         textBox.BackgroundColor3 = Color3.fromRGB(40, 45, 50)
         textBox.TextColor3 = Color3.new(1, 1, 1)
         Instance.new("UICorner", textBox)
-        
+
         local confirm = Instance.new("TextButton", rFrame)
         confirm.Size = UDim2.new(0.6, 0, 0.2, 0)
         confirm.Position = UDim2.new(0.2, 0, 0.7, 0)
         confirm.Text = "Confirm"
         confirm.BackgroundColor3 = Color3.fromRGB(60, 160, 60)
         Instance.new("UICorner", confirm)
-        
+
         confirm.MouseButton1Click:Connect(function()
             renameKoalaRemote:FireServer(currentInspectedKoala, textBox.Text)
             rGui:Destroy()
             gui:Destroy()
         end)
     end)
+end)
+
+-- Radial Wheel Outfit Trigger
+local openOutfitMenu = ReplicatedStorage:FindFirstChild("OpenOutfitMenu")
+if not openOutfitMenu then
+	openOutfitMenu = Instance.new("BindableEvent")
+	openOutfitMenu.Name = "OpenOutfitMenu"
+	openOutfitMenu.Parent = ReplicatedStorage
+end
+
+openOutfitMenu.Event:Connect(function(koala)
+	if koala and koala:GetAttribute("Stage") == 4 then
+		openOutfitSelection(koala, nil, nil)
+	end
 end)

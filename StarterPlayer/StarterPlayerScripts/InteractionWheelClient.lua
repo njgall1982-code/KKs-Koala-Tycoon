@@ -67,6 +67,14 @@ local function createWheelUI()
 				elseif action == "Rename" then
 					local inspectRequest = ReplicatedStorage:FindFirstChild("InspectRequest")
 					if inspectRequest then inspectRequest:FireServer(currentKoala) end
+				elseif action == "Outfits" then
+					local openOutfitMenu = ReplicatedStorage:FindFirstChild("OpenOutfitMenu")
+					if not openOutfitMenu then
+						openOutfitMenu = Instance.new("BindableEvent")
+						openOutfitMenu.Name = "OpenOutfitMenu"
+						openOutfitMenu.Parent = ReplicatedStorage
+					end
+					openOutfitMenu:Fire(currentKoala)
 				else
 					local actionToFire = btn:GetAttribute("CurrentAction") or action
 					koalaAction:FireServer(actionToFire, currentKoala)
@@ -88,6 +96,7 @@ local function createWheelUI()
 	createOption("Stats", 90, "ℹ️", "Stats")
 	createOption("Rename", 180, "🏷️", "Rename")
 	createOption("Follow", 135, "👣", "Follow")
+	createOption("Outfits", -45, "👗", "Outfits")
 
 	-- Initialize attributes
 	for _, child in pairs(center:GetChildren()) do
@@ -215,6 +224,12 @@ local function updateWheelState()
 		if label then
 			label.Text = isFollowingMe and "Stay" or "Follow"
 		end
+	end
+
+	local outfitsBtn = wheelGui.Center:FindFirstChild("Outfits")
+	if outfitsBtn and currentKoala then
+		local stage = currentKoala:GetAttribute("Stage") or 1
+		outfitsBtn.Visible = (stage == 4)
 	end
 end
 

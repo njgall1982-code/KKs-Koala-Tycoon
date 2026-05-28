@@ -16,6 +16,12 @@ function DataStore.SaveData(player)
 		rescuedDecoded = HttpService:JSONDecode(rescuedAttr)
 	end)
 
+	local unlockedAttr = player:GetAttribute("UnlockedOutfits") or "[]"
+	local unlockedDecoded = {}
+	pcall(function()
+		unlockedDecoded = HttpService:JSONDecode(unlockedAttr)
+	end)
+
 	local data = {
 		Cash = leaderstats.Cash.Value,
 		Conservation = leaderstats.Conservation.Value,
@@ -24,7 +30,8 @@ function DataStore.SaveData(player)
 		OwnedTools = {},
 		MilkBottles = player:GetAttribute("MilkBottles") or 0,
 		RescuedKoalas = rescuedDecoded,
-		MaxLeaves = player:GetAttribute("MaxLeaves") or 5
+		MaxLeaves = player:GetAttribute("MaxLeaves") or 5,
+		UnlockedOutfits = unlockedDecoded
 	}
 
 	local ownedTools = player:FindFirstChild("OwnedTools")
@@ -67,7 +74,8 @@ function DataStore.SaveData(player)
 				DisplayName = koala:GetAttribute("DisplayName") or koala.Name,
 				Rarity = stats:FindFirstChild("Rarity") and stats.Rarity.Value or "Cute",
 				Age = stats:FindFirstChild("Age") and stats.Age.Value or 0,
-				HomeExhibit = home
+				HomeExhibit = home,
+				Outfit = koala:GetAttribute("EquippedOutfit") or ""
 			})
 		else
 			print("[DataStore] ⚠️ Skipping Koala " .. koala.Name .. " (No Stats or HomeExhibit)")
@@ -110,6 +118,7 @@ function DataStore.LoadData(player)
 		player:SetAttribute("MilkBottles", result.MilkBottles or 0)
 		player:SetAttribute("RescuedKoalas", HttpService:JSONEncode(result.RescuedKoalas or {}))
 		player:SetAttribute("MaxLeaves", result.MaxLeaves or 5)
+		player:SetAttribute("UnlockedOutfits", HttpService:JSONEncode(result.UnlockedOutfits or {}))
 		
 		local tycoonKoalas = result.Koalas or {}
 		local pendingKoalas = result.RescuedKoalas or {}
@@ -234,6 +243,7 @@ function DataStore.LoadData(player)
 						local dummy = Instance.new("Model")
 						dummy.Name = kData.Name
 						dummy:SetAttribute("DisplayName", kData.DisplayName)
+						dummy:SetAttribute("EquippedOutfit", kData.Outfit or "")
 
 						local stats = Instance.new("Folder", dummy)
 						stats.Name = "KoalaStats"
@@ -285,6 +295,7 @@ function DataStore.LoadData(player)
 		player:SetAttribute("RescuedKoalas", "[]")
 		player:SetAttribute("MaxLeaves", 5)
 		player:SetAttribute("OwnedKoalasCount", 0)
+		player:SetAttribute("UnlockedOutfits", "[]")
 	end
 
 	player:SetAttribute("DataLoaded", true)

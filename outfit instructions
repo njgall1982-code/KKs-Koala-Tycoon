@@ -1,0 +1,51 @@
+-- KK's Koala Tycoon: Outfit & Accessory Registration Utility
+--
+-- SETUP INSTRUCTIONS:
+-- 1. Create a Folder named 'KoalaOutfits' in ReplicatedStorage.
+-- 2. Place your outfit (Model or Accessory) perfectly onto an Adult Koala in the Workspace.
+-- 3. Select the outfit in the Explorer.
+-- 4. Copy-paste this entire script into the Studio Command Bar (View -> Command Bar) and press Enter.
+-- 5. The script will calculate the offset, add attributes, and save a clean copy in ReplicatedStorage.KoalaOutfits.
+-- 6. Once saved, you can delete the visual editing copy from the Workspace!
+--
+-- RUN SCRIPT BELOW IN COMMAND BAR:
+local Selection = game:GetService("Selection")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local selected = Selection:Get()[1]
+if not selected or not (selected:IsA("Model") or selected:IsA("Accessory") or selected:IsA("BasePart") or selected:IsA("Tool")) then
+	error("Select the Outfit Model, Accessory, Part, or Tool in Explorer first!")
+end
+local koala = workspace:FindFirstChild("Koala") or workspace:FindFirstChildOfClass("Model")
+if not koala then error("Place an Adult Koala model in Workspace to align relative to.") end
+local attachPartName = "head" -- Attach to head bone
+local target = koala:FindFirstChild(attachPartName, true)
+if not target then
+	target = koala:FindFirstChild("HumanoidRootPart")
+	attachPartName = "HumanoidRootPart"
+	warn("head bone not found. Defaulting to HumanoidRootPart.")
+end
+local folder = ReplicatedStorage:FindFirstChild("KoalaOutfits") or Instance.new("Folder", ReplicatedStorage)
+folder.Name = "KoalaOutfits"
+local template = selected:Clone()
+template.Parent = folder
+template:SetAttribute("AttachPart", attachPartName)
+
+local handle = nil
+if template:IsA("Accessory") or template:IsA("Tool") then
+	handle = template:FindFirstChild("Handle")
+elseif template:IsA("BasePart") then
+	handle = template
+else
+	handle = template.PrimaryPart or template:FindFirstChildOfClass("BasePart")
+end
+if not handle then error("Outfit must have a PrimaryPart, a child named 'Handle', or be a BasePart/Tool!") end
+
+if target:IsA("Bone") or target:IsA("Attachment") then
+	local attach = handle:FindFirstChild("Attach") or Instance.new("Attachment", handle)
+	attach.Name = "Attach"
+	attach.CFrame = handle.CFrame:Inverse() * target.WorldCFrame
+	print("Registered bone-attached outfit: " .. template.Name)
+else
+	template:SetAttribute("AttachOffset", target.CFrame:Inverse() * handle.CFrame)
+	print("Registered part-attached outfit: " .. template.Name)
+end

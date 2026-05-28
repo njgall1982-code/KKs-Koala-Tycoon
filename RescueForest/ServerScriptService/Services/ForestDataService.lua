@@ -29,6 +29,10 @@ function ForestDataService.LoadData(player)
         player:SetAttribute("MilkBottles", bottles)
         player:SetAttribute("RescuedKoalas", HttpService:JSONEncode(result.RescuedKoalas or {}))
         
+        local tycoonKoalas = result.Koalas or {}
+        local pendingKoalas = result.RescuedKoalas or {}
+        player:SetAttribute("OwnedKoalasCount", #tycoonKoalas + #pendingKoalas)
+        
         -- Establish basic leaderstats to show cash/conservation in UI
         local leaderstats = player:FindFirstChild("leaderstats") or Instance.new("Folder", player)
         leaderstats.Name = "leaderstats"
@@ -60,6 +64,7 @@ function ForestDataService.LoadData(player)
         end
         player:SetAttribute("MilkBottles", bottles)
         player:SetAttribute("RescuedKoalas", "[]")
+        player:SetAttribute("OwnedKoalasCount", 0)
         warn("[ForestDataService] ⚠️ No data found or failed to load. Using defaults.")
     end
     player:SetAttribute("DataLoaded", true)

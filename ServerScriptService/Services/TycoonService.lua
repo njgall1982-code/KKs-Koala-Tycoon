@@ -28,6 +28,7 @@ function TycoonService.ClearProgress(player)
 			exhibit:SetAttribute("ExhibitLevel", 1)
 			exhibit:SetAttribute("FeederLevel", 1)
 			exhibit:SetAttribute("FoodLevel", 100)
+			exhibit:SetAttribute("WeedsCleared", nil)
 		end
 	end
 end
@@ -172,16 +173,32 @@ function TycoonService.CheckExhibitStatus(exhibit)
 	elseif exhibit.Name == "SecondExhibit_Workspace" then
 		local fence = exhibit:FindFirstChild("BrokenFence")
 		local shelter = exhibit:FindFirstChild("CollapsedShelter")
-		if (not fence or fence.Transparency == 0) and (not shelter or shelter:GetAttribute("IsFixed")) then
+		local weedsCleared = exhibit:GetAttribute("WeedsCleared") or false
+		if (not fence or fence.Transparency == 0) and (not shelter or shelter:GetAttribute("IsFixed")) and weedsCleared then
 			exhibit:SetAttribute("IsRepaired", true)
 		end
 	end
 end
 
 function TycoonService.InitializePlayer(player)
+	-- Clean up Head Vet if tutorial has already been completed
+	local hasExhibit = player:FindFirstChild("HasExhibit")
+	if hasExhibit and hasExhibit.Value then
+		local vet = workspace:FindFirstChild("HeadVet")
+		if vet then
+			vet:Destroy()
+			print("[TycoonService] 👨‍⚕️ Tutorial completed, Head Vet removed from workspace.")
+		end
+	end
+
 	-- Restore visuals based on attributes for all exhibits
 	for _, exhibit in ipairs(workspace:GetChildren()) do
 		if exhibit:IsA("Folder") and exhibit.Name:find("_Workspace") then
+			if exhibit:GetAttribute("WeedsCleared") then
+				local veg = exhibit:FindFirstChild("OvergrownVegetation")
+				if veg then veg:Destroy() end
+			end
+
 			if exhibit:GetAttribute("IsRepaired") then
 				-- Restore Fence
 				local fence = exhibit:FindFirstChild("BrokenFence")
@@ -348,7 +365,19 @@ function TycoonService.Initialize()
 						prompt.Enabled = false 
 						bush.Transparency = 1
 						bush.CanCollide = false
-						task.delay(0.5, function() bush:Destroy() end)
+						task.delay(0.5, function() 
+							bush:Destroy()
+							local remaining = 0
+							for _, b in pairs(veg:GetChildren()) do
+								if b:IsA("BasePart") then
+									remaining += 1
+								end
+							end
+							if remaining == 0 then
+								ex2:SetAttribute("WeedsCleared", true)
+								TycoonService.CheckExhibitStatus(ex2)
+							end
+						end)
 						TycoonService.UpdateStatus(player, "🧹 Weed cleared!")
 					else
 						TycoonService.UpdateStatus(player, "⚠️ Equip your Shovel to clear weeds!")

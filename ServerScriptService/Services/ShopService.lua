@@ -86,12 +86,23 @@ end
 function ShopService.HandlePurchaseRequest(player, toolName, price)
     -- Guard Clauses
     if not player or not toolName or not price then return end
+    
     local expectedPrice = TOOL_PRICES[toolName]
+    if toolName == "FeedBagUpgrade" then
+        local maxLeaves = player:GetAttribute("MaxLeaves") or 5
+        local upgradeLevel = (maxLeaves - 5) / 5
+        expectedPrice = 250 * (upgradeLevel + 1)
+    elseif toolName == "MilkBottle" then
+        local KoalaConfig = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("KoalaConfig"))
+        local ownedCount = player:GetAttribute("OwnedKoalasCount") or 0
+        expectedPrice = KoalaConfig.GetMilkBottlePrice(ownedCount)
+    end
+    
     if not expectedPrice or price ~= expectedPrice then return end
 
     -- Check capacity / ownership
     local consumable = isConsumable(toolName)
-    if not consumable then
+    if not consumable and toolName ~= "FeedBagUpgrade" then
         local ownedTools = player:FindFirstChild("OwnedTools")
         if ownedTools and ownedTools:FindFirstChild(toolName) then
             purchaseEvent:FireClient(player, false, toolName, "You already own this tool!")
@@ -108,10 +119,15 @@ function ShopService.HandlePurchaseRequest(player, toolName, price)
     local success, reason = transactionRequest:Invoke(player, expectedPrice, "Purchase_" .. toolName)
 	
     if success then
-        awardTool:Fire(player, toolName, not consumable)
-        if toolName == "MilkBottle" then
-            local current = player:GetAttribute("MilkBottles") or 0
-            player:SetAttribute("MilkBottles", current + 1)
+        if toolName == "FeedBagUpgrade" then
+            local currentMax = player:GetAttribute("MaxLeaves") or 5
+            player:SetAttribute("MaxLeaves", currentMax + 5)
+        else
+            awardTool:Fire(player, toolName, not consumable)
+            if toolName == "MilkBottle" then
+                local current = player:GetAttribute("MilkBottles") or 0
+                player:SetAttribute("MilkBottles", current + 1)
+            end
         end
         purchaseEvent:FireClient(player, true, toolName, "Purchase successful!")
     else

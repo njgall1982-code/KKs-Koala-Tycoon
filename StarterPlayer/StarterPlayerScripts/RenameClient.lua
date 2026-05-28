@@ -84,17 +84,22 @@ end)
 -- INSPECT KOALA
 local currentInspectedKoala = nil
 
-inspectKoalaRemote.OnClientEvent:Connect(function(koala)
+inspectKoalaRemote.OnClientEvent:Connect(function(koala, isModelSwap)
     if not koala then return end
     
     -- Update reference if model swapped
-    if currentInspectedKoala and currentInspectedKoala.Parent == nil then
+    if currentInspectedKoala then
         local oldName = currentInspectedKoala:GetAttribute("DisplayName")
         local newName = koala:GetAttribute("DisplayName")
         if oldName == newName then
             currentInspectedKoala = koala
             return
         end
+    end
+
+    -- If this is just a model swap event and we were not inspecting this koala, ignore it
+    if isModelSwap then
+        return
     end
 
     currentInspectedKoala = koala

@@ -108,4 +108,15 @@ function KoalaConfig.GetRevenueMultiplier(koala)
 	return stageMult * rarityMult
 end
 
+-- ============================================================
+-- MILK BOTTLE PRICING CONFIG
+-- ============================================================
+KoalaConfig.BASE_MILK_BOTTLE_PRICE = 50
+KoalaConfig.PRICE_PER_OWNED_KOALA = 25
+
+function KoalaConfig.GetMilkBottlePrice(ownedKoalasCount)
+	ownedKoalasCount = ownedKoalasCount or 0
+	return KoalaConfig.BASE_MILK_BOTTLE_PRICE + (ownedKoalasCount * KoalaConfig.PRICE_PER_OWNED_KOALA)
+end
+
 return KoalaConfig

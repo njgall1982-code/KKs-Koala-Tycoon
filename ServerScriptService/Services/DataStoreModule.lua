@@ -23,7 +23,8 @@ function DataStore.SaveData(player)
 		LeafCount = player:GetAttribute("LeafCount") or 0,
 		OwnedTools = {},
 		MilkBottles = player:GetAttribute("MilkBottles") or 0,
-		RescuedKoalas = rescuedDecoded
+		RescuedKoalas = rescuedDecoded,
+		MaxLeaves = player:GetAttribute("MaxLeaves") or 5
 	}
 
 	local ownedTools = player:FindFirstChild("OwnedTools")
@@ -43,7 +44,8 @@ function DataStore.SaveData(player)
 				MaxFoodLevel = exhibit:GetAttribute("MaxFoodLevel") or 100,
 				ExhibitLevel = exhibit:GetAttribute("ExhibitLevel") or 1,
 				FeederLevel = exhibit:GetAttribute("FeederLevel") or 1,
-				DisplayName = exhibit:GetAttribute("DisplayName") or ""
+				DisplayName = exhibit:GetAttribute("DisplayName") or "",
+				WeedsCleared = exhibit:GetAttribute("WeedsCleared") or false
 			}
 		end
 	end
@@ -107,6 +109,11 @@ function DataStore.LoadData(player)
 		player:SetAttribute("LeafCount", result.LeafCount or 0)
 		player:SetAttribute("MilkBottles", result.MilkBottles or 0)
 		player:SetAttribute("RescuedKoalas", HttpService:JSONEncode(result.RescuedKoalas or {}))
+		player:SetAttribute("MaxLeaves", result.MaxLeaves or 5)
+		
+		local tycoonKoalas = result.Koalas or {}
+		local pendingKoalas = result.RescuedKoalas or {}
+		player:SetAttribute("OwnedKoalasCount", #tycoonKoalas + #pendingKoalas)
 
 		-- Give Milk Bottles
 		local bottleTemplate = game:GetService("ServerStorage"):FindFirstChild("MilkBottle")
@@ -276,6 +283,8 @@ function DataStore.LoadData(player)
 		player:SetAttribute("LeafCount", 0)
 		player:SetAttribute("MilkBottles", 0)
 		player:SetAttribute("RescuedKoalas", "[]")
+		player:SetAttribute("MaxLeaves", 5)
+		player:SetAttribute("OwnedKoalasCount", 0)
 	end
 
 	player:SetAttribute("DataLoaded", true)

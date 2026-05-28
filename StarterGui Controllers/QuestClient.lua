@@ -9,6 +9,9 @@ local gui = script.Parent
 local frame = gui:WaitForChild("MainFrame")
 local objective = frame:WaitForChild("Objective")
 
+-- Hide frame by default on startup to prevent flashing old quest data
+frame.Visible = false
+
 local currentQuestId = 0
 
 local function typewrite(text)

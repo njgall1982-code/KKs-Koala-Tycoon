@@ -1,10 +1,22 @@
--- RescueClient (LocalScript)
--- Listens for RescueNotification events from the server and displays native pop-up notifications.
-
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 
+local player = Players.LocalPlayer
 local rescueNotifyEvent = ReplicatedStorage:WaitForChild("RescueNotification", 10)
+
+local function updateVendorPromptText()
+	local shop = workspace:FindFirstChild("Shop")
+	local vendor = shop and shop:FindFirstChild("Koala Vendor", true)
+	local hrp = vendor and vendor:FindFirstChild("HumanoidRootPart")
+	local prompt = hrp and hrp:FindFirstChild("VendorPrompt")
+	if prompt then
+		local KoalaConfig = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("KoalaConfig"))
+		local ownedCount = player:GetAttribute("OwnedKoalasCount") or 0
+		local price = KoalaConfig.GetMilkBottlePrice(ownedCount)
+		prompt.ActionText = "Buy Milk Bottle 🍼 ($" .. price .. ")"
+	end
+end
 
 if rescueNotifyEvent then
 	rescueNotifyEvent.OnClientEvent:Connect(function(success, message, rarity)
@@ -27,3 +39,17 @@ if rescueNotifyEvent then
 else
 	warn("[RescueClient] RescueNotification RemoteEvent not found in ReplicatedStorage.")
 end
+
+player:GetAttributeChangedSignal("OwnedKoalasCount"):Connect(updateVendorPromptText)
+
+workspace.DescendantAdded:Connect(function(desc)
+	if desc.Name == "VendorPrompt" then
+		updateVendorPromptText()
+	end
+end)
+
+-- Initial run
+task.spawn(function()
+	task.wait(1)
+	updateVendorPromptText()
+end)

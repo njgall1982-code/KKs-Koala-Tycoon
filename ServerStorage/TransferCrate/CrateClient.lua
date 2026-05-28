@@ -1,6 +1,5 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CollectionService = game:GetService("CollectionService")
 
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
@@ -30,21 +29,17 @@ tool.Activated:Connect(function()
 	if tick() - lastAction < COOLDOWN then return end
 	
 	local isCarrying = player:GetAttribute("Carrying") ~= nil
+	if not isCarrying then return end
 	
-	if isCarrying then
-		-- Use the player's position or the mouse hit position to find the exhibit
-		-- Checking mouse hit first, then falling back to player position
-		local exhibit = getExhibitAtPosition(mouse.Hit.Position) or getExhibitAtPosition(player.Character.PrimaryPart.Position)
-		
-		if exhibit then
-			lastAction = tick()
-			remote:FireServer("Drop", {pos = mouse.Hit.Position, exhibitName = exhibit.Name})
-		else
-			-- Provide some client-side feedback
-			print("Must be inside or clicking an Exhibit to release the koala!")
-		end
-	else
+	-- Use the player's position or the mouse hit position to find the exhibit
+	-- Checking mouse hit first, then falling back to player position
+	local exhibit = getExhibitAtPosition(mouse.Hit.Position) or getExhibitAtPosition(player.Character.PrimaryPart.Position)
+	
+	if exhibit then
 		lastAction = tick()
-		remote:FireServer("PickUp")
+		remote:FireServer("Drop", {pos = mouse.Hit.Position, exhibitName = exhibit.Name})
+	else
+		-- Provide some client-side feedback
+		print("Must be inside or clicking an Exhibit to release the koala!")
 	end
 end)

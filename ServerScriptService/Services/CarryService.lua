@@ -160,10 +160,10 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 	print('[CarryService] Attribute "Carrying" is: ' .. currentlyCarrying)
 
 	local character = player.Character
-	if not character then return end
+	if not character then return false end
 
 	local carryingName = player:GetAttribute("Carrying")
-	if not carryingName then return end
+	if not carryingName then return false end
 
 	-- Find the carried model
 	local searchContainers = {character, player.Backpack, workspace}
@@ -211,7 +211,7 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 					statusLabel.Visible = true
 					task.delay(5, function() statusLabel.Visible = false end)
 				end
-				return
+				return false
 			end
 
 			-- Capacity Check
@@ -233,13 +233,17 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 					statusLabel.Visible = true
 					task.delay(5, function() statusLabel.Visible = false end)
 				end
-				return
+				return false
 			end
 		end
 
 		-- Clean Arms
 		pcall(function() setArms(player, false) end)
 		player:SetAttribute("Carrying", nil)
+
+		-- Check if the koala is carried in a transfer crate
+		local crateTool = targetModel.Parent
+		local isCrate = crateTool and crateTool:IsA("Tool") and (crateTool.Name == "TransferCrate" or crateTool.Name == "CratedKoala")
 
 		-- Respawn
 		local spawnPos = dropCFrame.Position
@@ -254,10 +258,21 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 			if result then spawnPos = result.Position end
 		end
 
+		-- Trigger crate open VFX/sound if dropping from a crate
+		if isCrate then
+			local KoalaVFX = require(game:GetService("ServerScriptService").Modules.KoalaVFX)
+			KoalaVFX.ShowCrateOpenEffect(spawnPos)
+		end
+
 		local signals = game:GetService("ServerStorage"):FindFirstChild("Signals")
 		local respawnRequest = signals and signals:FindFirstChild("RespawnRequest")
 		if respawnRequest then
 			respawnRequest:Fire(targetModel, spawnPos, dropParent)
+		end
+
+		-- Automatically destroy empty crate tool
+		if isCrate then
+			crateTool:Destroy()
 		end
 
 		-- Tutorial Reward Logic
@@ -274,7 +289,10 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 				task.delay(5, function() updateQuest:Fire(player, "") end)
 			end
 		end
+
+		return true
 	end
+	return false
 end
 
 return CarryService

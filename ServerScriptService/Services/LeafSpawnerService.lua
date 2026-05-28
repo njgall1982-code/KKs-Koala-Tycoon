@@ -24,11 +24,19 @@ function LeafSpawnerService.Initialize()
 		
 		prompt.Triggered:Connect(function(player)
 			local current = player:GetAttribute("LeafCount") or 0
+			local maxLeaves = player:GetAttribute("MaxLeaves") or 5
+			
+			if current >= maxLeaves then
+				local TycoonService = require(game:GetService("ServerScriptService").Services.TycoonService)
+				TycoonService.UpdateStatus(player, "⚠️ Your Feed Bag is full! (" .. current .. "/" .. maxLeaves .. ")")
+				return
+			end
+			
 			player:SetAttribute("LeafCount", current + 1)
 			
 			-- Visual feedback
 			local TycoonService = require(game:GetService("ServerScriptService").Services.TycoonService)
-			TycoonService.UpdateStatus(player, "🌿 Collected Eucalyptus Leaf (" .. (current + 1) .. ")")
+			TycoonService.UpdateStatus(player, "🌿 Collected Eucalyptus Leaf (" .. (current + 1) .. "/" .. maxLeaves .. ")")
 			
 			leaf:Destroy()
 		end)

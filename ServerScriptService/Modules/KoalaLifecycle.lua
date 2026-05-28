@@ -166,7 +166,7 @@ function KoalaLifecycle.SwapModel(oldKoala, newStageName)
 	-- Notify clients
 	local inspectRemote = ReplicatedStorage:FindFirstChild("InspectKoala")
 	if inspectRemote then
-		inspectRemote:FireAllClients(newKoala)
+		inspectRemote:FireAllClients(newKoala, true)
 	end
 
 	print(string.format("[KoalaLifecycle] %s grew to %s! 🐨", oldName, stageData.name))

@@ -131,4 +131,62 @@ function KoalaVFX.ShowSleepyEffect(target)
 	end)
 end
 
+function KoalaVFX.ShowCrateOpenEffect(position)
+	local part = Instance.new("Part")
+	part.Name = "CrateOpenVFX"
+	part.Size = Vector3.new(1, 1, 1)
+	part.Position = position
+	part.Transparency = 1
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.Parent = workspace
+
+	-- 1. Wood splinter / dust particles
+	local woodParticles = Instance.new("ParticleEmitter")
+	woodParticles.Name = "WoodParticles"
+	woodParticles.Color = ColorSequence.new(Color3.fromRGB(150, 110, 80))
+	woodParticles.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.4),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	woodParticles.Lifetime = NumberRange.new(0.5, 0.8)
+	woodParticles.Rate = 0
+	woodParticles.Speed = NumberRange.new(4, 8)
+	woodParticles.SpreadAngle = Vector2.new(180, 180)
+	woodParticles.RotSpeed = NumberRange.new(-100, 100)
+	woodParticles.Parent = part
+
+	-- 2. Star/Sparkle particles
+	local sparkleParticles = Instance.new("ParticleEmitter")
+	sparkleParticles.Name = "SparkleParticles"
+	sparkleParticles.Color = ColorSequence.new(Color3.fromRGB(255, 215, 0))
+	sparkleParticles.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.3),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	sparkleParticles.Lifetime = NumberRange.new(0.6, 1.0)
+	sparkleParticles.Rate = 0
+	sparkleParticles.Speed = NumberRange.new(3, 6)
+	sparkleParticles.SpreadAngle = Vector2.new(180, 180)
+	sparkleParticles.Parent = part
+
+	-- 3. Play Satisfying Sound
+	local sound = Instance.new("Sound")
+	sound.SoundId = "rbxassetid://9073146432"
+	sound.Volume = 1.0
+	sound.Parent = part
+
+	-- Emit particles and play sound
+	sound:Play()
+	woodParticles:Emit(15)
+	sparkleParticles:Emit(10)
+
+	-- Clean up
+	task.delay(1.5, function()
+		if part then part:Destroy() end
+	end)
+end
+
 return KoalaVFX

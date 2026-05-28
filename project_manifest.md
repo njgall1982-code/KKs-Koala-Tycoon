@@ -6,9 +6,11 @@ We have successfully implemented the "Rescue KK" tutorial and refined the NPC AI
 
 ### 🛠️ Core Technical Pillars (Lessons Learned)
 
-PRIMARY: We copied the scripts to this folder. We need to keep these in sync. 
-- **The Protocol**: I will update the local folder first (Source of Truth) directly in the files here.  
-- **The Verification**: User will manually copy and paste scripts into Studio. This has become the only sure way we are making sure it is in sync
+PRIMARY: The local folder is the absolute Source of Truth for all scripts/files.
+- **The Protocol (Local-First Scripts)**: All script and code modifications must be done *exclusively* in the local files. The AI must never write script code directly to Roblox Studio via MCP.
+- **The Sync (User Copy-Paste)**: The user will copy and paste the updated script contents from the local folder into Roblox Studio.
+- **The Exception (Non-Script Objects via MCP)**: The AI will use the Roblox Studio MCP tools (like running Luau code) to inspect, place, and configure non-script objects (Parts, ProximityPrompts, Attributes, Tags, folder structures). This allows the AI to reference the game state as a source of truth without editing script code in Studio.
+- **The Verification**: Always verify that the local codebase has been modified before notifying the user of needed copy-paste operations.
 
 #### 1. The "Physics Lock" for Climbing
 - **The Problem**: CFraming an unanchored model into a solid part (Tree) creates explosive physics pressure.
@@ -60,10 +62,11 @@ PRIMARY: We copied the scripts to this folder. We need to keep these in sync.
 ---
 
 ### 🤝 How We Work Together (AI + Human)
-1.  **Human handles Placement**: Move buildings and NPCs manually in Studio. The AI will see the new coordinates.
-2.  **AI handles Brains**: The AI writes the scripts for quests, money, and animal behavior.
-3.  **Surgical Changes**: Fix one thing at a time. Don't let the AI delete and recreate large parts of your world.
-4.  **Health Checks**: If a button stops working, check the "Explorer" to see if the `ProximityPrompt` is still there and enabled.
+1.  **AI writes local scripts**: The AI writes/updates scripts only in the local directory. It explains precisely what it changed, so the human can copy/paste it into Studio.
+2.  **AI handles object manipulation via MCP**: The AI uses the Roblox Studio MCP tools to inspect the game tree, place models/parts, configure ProximityPrompts, and check current world state properties.
+3.  **Surgical Changes**: Fix one feature/bug at a time. Never delete, rewrite, or leave out unrelated code, imports, or local declarations.
+4.  **No Regression Search**: Before modifying functions or scripts, the AI must search the codebase for references to those symbols or systems to ensure no external dependencies are broken.
+5.  **Health Checks**: If a system fails, use the MCP tools to inspect the Explorer hierarchy and check if instances exist and have correct attributes/properties.
 
 ### 📅 Next Session Goals
 1.

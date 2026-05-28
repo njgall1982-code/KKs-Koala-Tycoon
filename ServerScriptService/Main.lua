@@ -44,6 +44,7 @@ local KoalaStatService = safeRequire(ServerScriptService.Services.KoalaStatServi
 local KoalaCoreManager = safeRequire(ServerScriptService.Services.KoalaCoreManager)
 local ExhibitUpgradeService = safeRequire(ServerScriptService.Services.ExhibitUpgradeService)
 local DevService = safeRequire(ServerScriptService.Services.DevService)
+local FeederVisualService = safeRequire(ServerScriptService.Services.FeederVisualService)
 
 -- New Refactored Services
 local KoalaSystem = safeRequire(ServerScriptService.Services.KoalaSystem)
@@ -83,6 +84,17 @@ signals.AwardTool.Event:Connect(function(player, toolName, isPermanent)
 	end
 end)
 
+-- Create FeedBag tool in ServerStorage dynamically if it is missing
+local feedBagTemplate = ServerStorage:FindFirstChild("FeedBag")
+if not feedBagTemplate then
+	feedBagTemplate = Instance.new("Tool")
+	feedBagTemplate.Name = "FeedBag"
+	feedBagTemplate.ToolTip = "Holds Eucalyptus Leaves to refill feeders"
+	feedBagTemplate.RequiresHandle = false
+	feedBagTemplate.Parent = ServerStorage
+	print("[Main] 🌿 Created FeedBag template dynamically in ServerStorage.")
+end
+
 -- 5. Initialize Systems Safely
 local function safeInit(service, name)
 	if service and service.Initialize then
@@ -107,6 +119,7 @@ safeInit(KoalaCoreManager, "KoalaCoreManager")
 safeInit(ExhibitUpgradeService, "ExhibitUpgradeService")
 safeInit(CarryService, "CarryService")
 safeInit(DevService, "DevService")
+safeInit(FeederVisualService, "FeederVisualService")
 
 -- New Services
 safeInit(KoalaSystem, "KoalaSystem")
@@ -129,6 +142,14 @@ local function onPlayerAdded(player)
 		if hammerTemplate then
 			if not player.Backpack:FindFirstChild("WoodenHammer") and not character:FindFirstChild("WoodenHammer") then
 				hammerTemplate:Clone().Parent = player.Backpack
+			end
+		end
+
+		-- Give Feed Bag
+		local feedBagTemplate = ServerStorage:FindFirstChild("FeedBag")
+		if feedBagTemplate then
+			if not player.Backpack:FindFirstChild("FeedBag") and not character:FindFirstChild("FeedBag") then
+				feedBagTemplate:Clone().Parent = player.Backpack
 			end
 		end
 
@@ -169,8 +190,13 @@ local function onPlayerAdded(player)
 				TycoonService.InitializePlayer(player)
 			end
 
-			-- Send Welcome Message
-			signals.UpdateQuest:Fire(player, "👋 Welcome! Repair Exhibit 1 🔨 then talk to the Head Vet 👨‍⚕️")
+			-- Send Welcome Message (only if tutorial not completed)
+			local hasExhibit = player:FindFirstChild("HasExhibit")
+			if hasExhibit and not hasExhibit.Value then
+				signals.UpdateQuest:Fire(player, "👋 Welcome! Repair Exhibit 1 🔨 then talk to the Head Vet 👨‍⚕️")
+			else
+				signals.UpdateQuest:Fire(player, "")
+			end
 		end)
 	end
 

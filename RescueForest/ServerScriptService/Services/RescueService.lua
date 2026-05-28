@@ -20,6 +20,62 @@ end
 
 function RescueService.Initialize()
     print("[RescueService] Initialized.")
+    
+    -- Setup Koala Vendor ProximityPrompt
+    task.spawn(function()
+        local shop = workspace:WaitForChild("Shop", 10)
+        local vendor = shop and shop:WaitForChild("Koala Vendor", 10)
+        
+        if vendor then
+            local hrp = vendor:WaitForChild("HumanoidRootPart", 5)
+            if hrp then
+                local prompt = hrp:FindFirstChild("VendorPrompt") or Instance.new("ProximityPrompt")
+                prompt.Name = "VendorPrompt"
+                prompt.ObjectText = "Koala Vendor"
+                prompt.ActionText = "Buy Milk Bottle 🍼"
+                prompt.HoldDuration = 0.5
+                prompt.MaxActivationDistance = 10
+                prompt.RequiresLineOfSight = false
+                prompt.Parent = hrp
+                
+                prompt.Triggered:Connect(function(player)
+                    local ownedCount = player:GetAttribute("OwnedKoalasCount") or 0
+                    local price = KoalaConfig.GetMilkBottlePrice(ownedCount)
+                    
+                    local currentBottles = player:GetAttribute("MilkBottles") or 0
+                    if currentBottles >= 5 then
+                        rescueNotifyEvent:FireClient(player, false, "You can only hold 5 Milk Bottles at a time!")
+                        return
+                    end
+                    
+                    local leaderstats = player:FindFirstChild("leaderstats")
+                    local cash = leaderstats and leaderstats:FindFirstChild("Cash")
+                    if not cash or cash.Value < price then
+                        rescueNotifyEvent:FireClient(player, false, "Insufficient Cash! You need $" .. price .. " to buy a Milk Bottle.")
+                        return
+                    end
+                    
+                    cash.Value -= price
+                    player:SetAttribute("MilkBottles", currentBottles + 1)
+                    
+                    local path = ServerScriptService:FindFirstChild("RescueForest_Services", true) or ServerScriptService:FindFirstChild("Services")
+                    local ForestDataService = path and path:FindFirstChild("ForestDataService") and require(path.ForestDataService)
+                    if ForestDataService then
+                        ForestDataService.SyncMilkBottlesToBackpack(player)
+                        ForestDataService.SaveData(player)
+                    end
+                    
+                    rescueNotifyEvent:FireClient(player, true, "Purchased Milk Bottle 🍼 for $" .. price .. "!", "Cute")
+                end)
+                
+                print("[RescueService] Successfully hooked up ProximityPrompt to Koala Vendor.")
+            else
+                warn("[RescueService] HumanoidRootPart not found on Koala Vendor.")
+            end
+        else
+            warn("[RescueService] Koala Vendor not found in Workspace.Shop.")
+        end
+    end)
 end
 
 -- Helper to find and consume one Milk Bottle tool from Player's inventory
@@ -87,6 +143,9 @@ function RescueService.RescueJoey(player, joeyInstance)
         Age = 0
     })
     player:SetAttribute("RescuedKoalas", HttpService:JSONEncode(rescuedList))
+    
+    local ownedCount = player:GetAttribute("OwnedKoalasCount") or 0
+    player:SetAttribute("OwnedKoalasCount", ownedCount + 1)
 
     -- Destroy wild Joey in forest
     joeyInstance:Destroy()
@@ -101,13 +160,17 @@ function RescueService.RescueJoey(player, joeyInstance)
         transferCrateTemplate = ServerStorage:FindFirstChild("TransferCrate")
     end
 
-    local koalaTemplate = ServerStorage:FindFirstChild("WildJoey")
+    local koalaTemplate = ServerStorage:FindFirstChild("Koala Baby")
+    if not koalaTemplate then
+        local prototypes = ServerStorage:FindFirstChild("Prototypes")
+        koalaTemplate = prototypes and prototypes:FindFirstChild("Koala Baby")
+    end
+    if not koalaTemplate then
+        koalaTemplate = ServerStorage:FindFirstChild("WildJoey")
+    end
     if not koalaTemplate then
         local prototypes = ServerStorage:FindFirstChild("Prototypes")
         koalaTemplate = prototypes and prototypes:FindFirstChild("WildJoey")
-    end
-    if not koalaTemplate then
-        koalaTemplate = ServerStorage:FindFirstChild("Koala Baby")
     end
     if not koalaTemplate then
         local pickFolder = ServerStorage:FindFirstChild("Koalas to pick from")

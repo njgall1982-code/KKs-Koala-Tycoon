@@ -5,6 +5,8 @@ local ServerStorage = game:GetService("ServerStorage")
 local CollectionService = game:GetService("CollectionService")
 local HttpService = game:GetService("HttpService")
 
+local OutfitShopConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("OutfitShopConfig"))
+
 -- Remote Events
 local equipOutfitRequest = ReplicatedStorage:FindFirstChild("EquipOutfitRequest")
 if not equipOutfitRequest then
@@ -17,23 +19,40 @@ end
 -- OUTFIT EQUIPMENT LOGIC
 -- ============================================================
 
--- Unequip any outfit currently on the koala
-function KoalaOutfitService.UnequipOutfit(koala)
-	local existing = koala:FindFirstChild("EquippedOutfitModel")
+-- Unequip any outfit currently on the koala in the given slot (e.g. "Hat", "Necklace")
+function KoalaOutfitService.UnequipOutfit(koala, slot)
+	slot = slot or "Hat"
+
+	-- Legacy cleanup (for old single-outfit attribute and model name)
+	if slot == "Hat" then
+		local legacyModel = koala:FindFirstChild("EquippedOutfitModel")
+		if legacyModel then
+			legacyModel:Destroy()
+		end
+		if koala:GetAttribute("EquippedOutfit") then
+			koala:SetAttribute("EquippedOutfit", nil)
+		end
+	end
+
+	local modelName = "EquippedOutfitModel_" .. slot
+	local existing = koala:FindFirstChild(modelName)
 	if existing then
 		existing:Destroy()
 	end
-	koala:SetAttribute("EquippedOutfit", nil)
+	koala:SetAttribute("EquippedOutfit_" .. slot, nil)
 end
 
 -- Equip a specified outfit to the koala
 function KoalaOutfitService.EquipOutfit(koala, outfitName)
-	-- Remove existing first
-	KoalaOutfitService.UnequipOutfit(koala)
-
 	if not outfitName or outfitName == "" then
 		return
 	end
+
+	local config = OutfitShopConfig.GetOutfit(outfitName)
+	local slot = config and config.Type or "Hat"
+
+	-- Remove existing in this slot first
+	KoalaOutfitService.UnequipOutfit(koala, slot)
 
 	-- Outfits are restricted to Adult koalas (Stage 4)
 	local stage = koala:GetAttribute("Stage") or 1
@@ -56,7 +75,7 @@ function KoalaOutfitService.EquipOutfit(koala, outfitName)
 
 	-- Clone and position outfit
 	local outfitModel = template:Clone()
-	outfitModel.Name = "EquippedOutfitModel"
+	outfitModel.Name = "EquippedOutfitModel_" .. slot
 
 	local handle = nil
 	if outfitModel:IsA("Accessory") or outfitModel:IsA("Tool") then
@@ -82,7 +101,22 @@ function KoalaOutfitService.EquipOutfit(koala, outfitName)
 
 	outfitModel.Parent = koala
 
-	-- Handle weld attachment based on target type
+	-- 1. Weld all parts to the handle first (while in their correct template relative positions) and configure collisions
+	for _, part in ipairs(outfitModel:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.CanCollide = false
+			part.CanTouch = false
+			part.CanQuery = false
+			if part ~= handle then
+				local w = Instance.new("WeldConstraint")
+				w.Part0 = part
+				w.Part1 = handle
+				w.Parent = part
+			end
+		end
+	end
+
+	-- 2. Position the outfit (using PivotTo for models, preserving relative welded positions)
 	if target:IsA("Bone") or target:IsA("Attachment") then
 		local attach = handle:FindFirstChild("Attach")
 		if not attach then
@@ -99,7 +133,11 @@ function KoalaOutfitService.EquipOutfit(koala, outfitName)
 	else
 		-- Standard CFrame Weld for BaseParts
 		local offset = outfitModel:GetAttribute("AttachOffset") or CFrame.new()
-		handle.CFrame = target.CFrame * offset
+		if outfitModel:IsA("Model") then
+			outfitModel:PivotTo(target.CFrame * offset)
+		else
+			handle.CFrame = target.CFrame * offset
+		end
 
 		local weld = Instance.new("WeldConstraint")
 		weld.Name = "OutfitWeld"
@@ -108,68 +146,76 @@ function KoalaOutfitService.EquipOutfit(koala, outfitName)
 		weld.Parent = handle
 	end
 
-	-- Weld all other parts in the outfit to the handle and ensure they are unanchored/non-collidable
+	-- 3. Unanchor all parts now that they are welded and correctly positioned
 	for _, part in ipairs(outfitModel:GetDescendants()) do
 		if part:IsA("BasePart") then
 			part.Anchored = false
-			part.CanCollide = false
-			part.CanTouch = false
-			part.CanQuery = false
-			if part ~= handle then
-				local w = Instance.new("WeldConstraint")
-				w.Part0 = part
-				w.Part1 = handle
-				w.Parent = part
-			end
 		end
 	end
 
-	koala:SetAttribute("EquippedOutfit", outfitName)
-	print(string.format("[KoalaOutfitService] Equipped outfit '%s' onto adult koala '%s'", outfitName, koala:GetAttribute("DisplayName") or koala.Name))
+	koala:SetAttribute("EquippedOutfit_" .. slot, outfitName)
+	print(string.format("[KoalaOutfitService] Equipped outfit '%s' onto adult koala '%s' in slot '%s'", outfitName, koala:GetAttribute("DisplayName") or koala.Name, slot))
 end
 
 -- ============================================================
 -- UNLOCK OUT_FITS / PICKUPS
 -- ============================================================
 
--- Unlock an outfit for a specific player
-function KoalaOutfitService.UnlockOutfit(player, outfitName)
-	if not player or not outfitName or outfitName == "" then return end
-
-	local unlockedStr = player:GetAttribute("UnlockedOutfits") or "[]"
+-- Helper function to safely get and migrate UnlockedOutfits to a dictionary
+local function getUnlockedOutfitsDict(player)
+	local unlockedStr = player:GetAttribute("UnlockedOutfits") or "{}"
 	local unlocked = {}
 	pcall(function()
 		unlocked = HttpService:JSONDecode(unlockedStr)
 	end)
 
-	-- Check if already unlocked
-	local found = false
-	for _, name in ipairs(unlocked) do
-		if name == outfitName then
-			found = true
-			break
+	-- If it's a legacy array, migrate it to a dictionary
+	local isArray = false
+	if unlocked and next(unlocked) ~= nil then
+		if type(next(unlocked)) == "number" then
+			isArray = true
 		end
 	end
 
-	if not found then
-		table.insert(unlocked, outfitName)
+	if isArray then
+		local dict = {}
+		for _, name in ipairs(unlocked) do
+			dict[name] = (dict[name] or 0) + 1
+		end
+		unlocked = dict
 		player:SetAttribute("UnlockedOutfits", HttpService:JSONEncode(unlocked))
-		print(string.format("[KoalaOutfitService] Player %s unlocked outfit: %s", player.Name, outfitName))
-
-		-- Show quest or chat notification if needed
-		local signals = ServerStorage:FindFirstChild("Signals")
-		local updateQuest = signals and signals:FindFirstChild("UpdateQuest")
-		if updateQuest then
-			updateQuest:Fire(player, "🎉 Found Outfit: " .. outfitName .. "! Equip it on your adult koalas.")
-			task.spawn(function()
-				task.wait(5)
-				-- Clear notification if they haven't gotten another quest update
-				if player:GetAttribute("DataLoaded") then
-					updateQuest:Fire(player, "")
-				end
-			end)
-		end
 	end
+
+	return unlocked
+end
+
+-- Unlock/Add an outfit for a specific player
+function KoalaOutfitService.UnlockOutfit(player, outfitName)
+	if not player or not outfitName or outfitName == "" then return end
+
+	local unlocked = getUnlockedOutfitsDict(player)
+	unlocked[outfitName] = (unlocked[outfitName] or 0) + 1
+	player:SetAttribute("UnlockedOutfits", HttpService:JSONEncode(unlocked))
+	print(string.format("[KoalaOutfitService] Player %s gained outfit: %s (Now owns: %d)", player.Name, outfitName, unlocked[outfitName]))
+
+	-- Show quest or chat notification if needed
+	local signals = ServerStorage:FindFirstChild("Signals")
+	local updateQuest = signals and signals:FindFirstChild("UpdateQuest")
+	if updateQuest then
+		updateQuest:Fire(player, "🎉 Gained Outfit: " .. outfitName .. "! Equip it on your adult koalas.")
+		task.spawn(function()
+			task.wait(5)
+			-- Clear notification if they haven't gotten another quest update
+			if player:GetAttribute("DataLoaded") then
+				updateQuest:Fire(player, "")
+			end
+		end)
+	end
+end
+
+-- Expose dict getter for client/other scripts
+function KoalaOutfitService.GetUnlockedOutfits(player)
+	return getUnlockedOutfitsDict(player)
 end
 
 -- ============================================================
@@ -177,36 +223,12 @@ end
 -- ============================================================
 
 function KoalaOutfitService.Initialize()
-	-- Listen for equip requests from clients
-	equipOutfitRequest.OnServerEvent:Connect(function(player, koala, outfitName)
+	-- Listen for equip requests from clients (optional slot parameter for unequipping)
+	equipOutfitRequest.OnServerEvent:Connect(function(player, koala, outfitName, slot)
 		if not koala or not koala:IsDescendantOf(workspace) then return end
 
 		-- Safety verification: Is it a Koala?
 		if not (koala:IsA("Model") and (koala.Name:find("Koala") or koala.Name:find("KK") or CollectionService:HasTag(koala, "KoalaNPC"))) then
-			return
-		end
-
-		-- Verify ownership/unlock
-		local unlockedStr = player:GetAttribute("UnlockedOutfits") or "[]"
-		local unlocked = {}
-		pcall(function()
-			unlocked = HttpService:JSONDecode(unlockedStr)
-		end)
-
-		local isUnlocked = false
-		if outfitName == "" or outfitName == nil then
-			isUnlocked = true -- Unequip is always allowed
-		else
-			for _, name in ipairs(unlocked) do
-				if name == outfitName then
-					isUnlocked = true
-					break
-				end
-			end
-		end
-
-		if not isUnlocked then
-			warn(string.format("[KoalaOutfitService] Player %s tried to equip locked outfit '%s'", player.Name, tostring(outfitName)))
 			return
 		end
 
@@ -217,8 +239,58 @@ function KoalaOutfitService.Initialize()
 			return
 		end
 
-		-- Apply equipment
-		KoalaOutfitService.EquipOutfit(koala, outfitName)
+		local unlocked = getUnlockedOutfitsDict(player)
+
+		-- Resolve slot/type
+		local config = outfitName and outfitName ~= "" and OutfitShopConfig.GetOutfit(outfitName)
+		local resolvedSlot = slot
+		if config then
+			resolvedSlot = config.Type or resolvedSlot or "Hat"
+		else
+			resolvedSlot = resolvedSlot or "Hat"
+		end
+
+		-- Load current outfit in slot, with backward compatibility fallback for Hat
+		local currentOutfit = koala:GetAttribute("EquippedOutfit_" .. resolvedSlot)
+		if not currentOutfit and resolvedSlot == "Hat" then
+			currentOutfit = koala:GetAttribute("EquippedOutfit")
+		end
+		currentOutfit = currentOutfit or ""
+
+		if outfitName == "" or outfitName == nil then
+			-- Unequip request
+			if currentOutfit ~= "" then
+				-- Return old outfit to player's unassigned inventory
+				unlocked[currentOutfit] = (unlocked[currentOutfit] or 0) + 1
+				player:SetAttribute("UnlockedOutfits", HttpService:JSONEncode(unlocked))
+				KoalaOutfitService.UnequipOutfit(koala, resolvedSlot)
+			end
+		else
+			-- Equip request
+			if currentOutfit == outfitName then
+				-- Already wearing this; do nothing or refresh weld
+				KoalaOutfitService.EquipOutfit(koala, outfitName)
+				return
+			end
+
+			-- Check if player has the requested outfit available in inventory
+			local count = unlocked[outfitName] or 0
+			if count <= 0 then
+				warn(string.format("[KoalaOutfitService] Player %s tried to equip locked/unavailable outfit '%s'", player.Name, tostring(outfitName)))
+				return
+			end
+
+			-- Return old outfit to inventory if replacing
+			if currentOutfit ~= "" then
+				unlocked[currentOutfit] = (unlocked[currentOutfit] or 0) + 1
+			end
+
+			-- Deduct new outfit from inventory
+			unlocked[outfitName] = count - 1
+
+			player:SetAttribute("UnlockedOutfits", HttpService:JSONEncode(unlocked))
+			KoalaOutfitService.EquipOutfit(koala, outfitName)
+		end
 	end)
 
 	-- Handle Outfit Pickups via ProximityPrompts globally
@@ -240,12 +312,11 @@ function KoalaOutfitService.Initialize()
 			-- Fallback: Look for a StringValue inside the prompt or parent
 			local strVal = prompt:FindFirstChildOfClass("StringValue") or (prompt.Parent and prompt.Parent:FindFirstChildOfClass("StringValue"))
 			if strVal then
-				-- If the Value is set, use it; otherwise, use the StringValue's Name!
 				outfitName = (strVal.Value ~= "") and strVal.Value or strVal.Name
 			end
 		end
 
-		-- Second Fallback: If no string value or attribute, use the parent model/accessory name!
+		-- Second Fallback: If no string value or attribute, use the parent model/accessory name
 		if not outfitName or outfitName == "" then
 			if prompt.Parent and (prompt.Parent:IsA("Model") or prompt.Parent:IsA("Accessory")) then
 				outfitName = prompt.Parent.Name

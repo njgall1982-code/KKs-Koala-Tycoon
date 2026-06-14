@@ -46,6 +46,7 @@ local ExhibitUpgradeService = safeRequire(ServerScriptService.Services.ExhibitUp
 local DevService = safeRequire(ServerScriptService.Services.DevService)
 local FeederVisualService = safeRequire(ServerScriptService.Services.FeederVisualService)
 local KoalaOutfitService = safeRequire(ServerScriptService.Services.KoalaOutfitService)
+local OutfitShopService = safeRequire(ServerScriptService.Services.OutfitShopService)
 
 -- New Refactored Services
 local KoalaSystem = safeRequire(ServerScriptService.Services.KoalaSystem)
@@ -122,6 +123,7 @@ safeInit(CarryService, "CarryService")
 safeInit(DevService, "DevService")
 safeInit(FeederVisualService, "FeederVisualService")
 safeInit(KoalaOutfitService, "KoalaOutfitService")
+safeInit(OutfitShopService, "OutfitShopService")
 
 -- New Services
 safeInit(KoalaSystem, "KoalaSystem")

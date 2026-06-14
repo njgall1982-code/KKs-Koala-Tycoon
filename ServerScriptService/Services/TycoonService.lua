@@ -11,6 +11,49 @@ local forcePickupSignal = signals:WaitForChild("ForcePickup")
 
 local playerRepairs = {}
 
+local function spawnHut(exhibit, basePosition)
+	local templates = ServerStorage:FindFirstChild("Template")
+	local hutTemplate = templates and templates:FindFirstChild("HutTemplate")
+	if not hutTemplate then
+		warn("[TycoonService] HutTemplate not found in ServerStorage.Template!")
+		return nil
+	end
+
+	local existing = exhibit:FindFirstChild("CollapsedShelter")
+	if existing then existing:Destroy() end
+
+	local hutClone = hutTemplate:Clone()
+	hutClone.Name = "CollapsedShelter"
+	hutClone:SetAttribute("IsFixed", true)
+
+	local newPivot = CFrame.new(basePosition.X, hutTemplate:GetPivot().Position.Y, basePosition.Z) * hutTemplate:GetPivot().Rotation
+	hutClone:PivotTo(newPivot)
+	hutClone.Parent = exhibit
+
+	print("[TycoonService] Spawned Hut at " .. tostring(newPivot.Position))
+	return hutClone
+end
+
+local function spawnBrokenShelter(exhibit)
+	local templates = ServerStorage:FindFirstChild("Template")
+	local collapsedTemplate = templates and templates:FindFirstChild("CollapsedShelterTemplate")
+	if not collapsedTemplate then
+		warn("[TycoonService] CollapsedShelterTemplate not found!")
+		return nil
+	end
+
+	local existing = exhibit:FindFirstChild("CollapsedShelter")
+	if existing then existing:Destroy() end
+
+	local collapsedClone = collapsedTemplate:Clone()
+	collapsedClone.Name = "CollapsedShelter"
+	collapsedClone:SetAttribute("IsFixed", nil)
+	collapsedClone.Parent = exhibit
+
+	print("[TycoonService] Restored broken CollapsedShelter")
+	return collapsedClone
+end
+
 function TycoonService.ClearProgress(player)
 	print("[TycoonService] Clearing repair progress for: " .. player.Name)
 	for key, _ in pairs(playerRepairs) do
@@ -48,19 +91,8 @@ function TycoonService.ResetWorld()
 			end
 			
 			-- Re-break Shelter
-			local shelter = exhibit:FindFirstChild("CollapsedShelter")
-			if shelter then
-				shelter:SetAttribute("IsFixed", nil)
-				local base = shelter:FindFirstChild("Base")
-				local r1 = shelter:FindFirstChild("RoofPiece1")
-				local r2 = shelter:FindFirstChild("RoofPiece2")
-				if base and r1 and r2 then
-					base.Color = Color3.fromRGB(163, 162, 165) -- Grayish
-					r1.Color = Color3.fromRGB(163, 162, 165)
-					r2.Color = Color3.fromRGB(163, 162, 165)
-					r1.Anchored = false -- Let them fall
-					r2.Anchored = false
-				end
+			if exhibit.Name == "SecondExhibit_Workspace" then
+				spawnBrokenShelter(exhibit)
 			end
 		end
 	end
@@ -127,34 +159,11 @@ function TycoonService.HandleRepair(player, exhibit, part, toolRequired)
 			if prompt then prompt:Destroy() end
 		elseif part.Name == "CollapsedShelter" or part.Name == "Base" then
 			exhibit:SetAttribute("ShelterFixed", true)
-			local model = part.Parent
-			model:SetAttribute("IsFixed", true)
-
-			-- Reposition pieces into a "Fixed" shelter
+			local model = part:IsA("Model") and part or part.Parent
 			local base = model:FindFirstChild("Base")
-			local r1 = model:FindFirstChild("RoofPiece1")
-			local r2 = model:FindFirstChild("RoofPiece2")
-
-			if base and r1 and r2 then
-				local center = base.Position
-				base.Color = Color3.fromRGB(101, 67, 33)
-
-				r1.CFrame = CFrame.new(center + Vector3.new(2, 3, 0)) * CFrame.Angles(0, 0, math.rad(-45))
-				r2.CFrame = CFrame.new(center + Vector3.new(-2, 3, 0)) * CFrame.Angles(0, 0, math.rad(45))
-
-				r1.Color = Color3.fromRGB(101, 67, 33)
-				r2.Color = Color3.fromRGB(101, 67, 33)
-
-				r1.Anchored = true
-				r2.Anchored = true
-			end
-
-			local prompt = base:FindFirstChildOfClass("ProximityPrompt")
-			if prompt then prompt:Destroy() end
-
-			-- Final Snap Alignment
-			base.CFrame = base.CFrame -- Ensure it's where it should be
-			base.Anchored = true
+			local basePos = base and base.Position or Vector3.new(144.762573, 6.49997616, 8.49999905)
+			
+			spawnHut(exhibit, basePos)
 		end
 
 		-- Check if exhibit is fully repaired
@@ -220,21 +229,8 @@ function TycoonService.InitializePlayer(player)
 				local shelter = exhibit:FindFirstChild("CollapsedShelter")
 				if shelter then
 					local base = shelter:FindFirstChild("Base")
-					local r1 = shelter:FindFirstChild("RoofPiece1")
-					local r2 = shelter:FindFirstChild("RoofPiece2")
-					if base and r1 and r2 then
-						local center = base.Position
-						base.Color = Color3.fromRGB(101, 67, 33)
-						r1.CFrame = CFrame.new(center + Vector3.new(2, 3, 0)) * CFrame.Angles(0, 0, math.rad(-45))
-						r2.CFrame = CFrame.new(center + Vector3.new(-2, 3, 0)) * CFrame.Angles(0, 0, math.rad(45))
-						r1.Color = Color3.fromRGB(101, 67, 33)
-						r2.Color = Color3.fromRGB(101, 67, 33)
-						r1.Anchored = true
-						r2.Anchored = true
-						
-						local p = base:FindFirstChildOfClass("ProximityPrompt")
-						if p then p:Destroy() end
-					end
+					local basePos = base and base.Position or Vector3.new(144.762573, 6.49997616, 8.49999905)
+					spawnHut(exhibit, basePos)
 				end
 			end
 		end
@@ -303,6 +299,41 @@ end
 
 function TycoonService.Initialize()
 	print("[TycoonService] Initialize() called")
+	
+	-- Template management
+	local templates = ServerStorage:FindFirstChild("Template")
+	if templates then
+		-- Setup HutTemplate
+		local originalHut = workspace:FindFirstChild("Hut")
+		if originalHut then
+			local oldTemplate = templates:FindFirstChild("HutTemplate")
+			if oldTemplate then oldTemplate:Destroy() end
+			originalHut.Name = "HutTemplate"
+			originalHut.Parent = templates
+			print("[TycoonService] Moved Hut to templates folder as HutTemplate")
+		end
+
+		-- Setup CollapsedShelterTemplate
+		local ex2 = workspace:FindFirstChild("SecondExhibit_Workspace")
+		local collapsed = ex2 and ex2:FindFirstChild("CollapsedShelter")
+		if collapsed and not collapsed:GetAttribute("IsFixed") and collapsed:FindFirstChild("Base") then
+			local oldTemplate = templates:FindFirstChild("CollapsedShelterTemplate")
+			if oldTemplate then oldTemplate:Destroy() end
+			local collapsedTemplate = collapsed:Clone()
+			collapsedTemplate.Name = "CollapsedShelterTemplate"
+			
+			local base = collapsedTemplate:FindFirstChild("Base")
+			if base then
+				for _, p in ipairs(base:GetChildren()) do
+					if p:IsA("ProximityPrompt") then p:Destroy() end
+				end
+			end
+			
+			collapsedTemplate.Parent = templates
+			print("[TycoonService] Created CollapsedShelterTemplate backup in ServerStorage.Template")
+		end
+	end
+
 	local ex1 = workspace:FindFirstChild("TutorialExhibit_Workspace")
 	if ex1 then
 		local fence = ex1:FindFirstChild("BrokenFence")

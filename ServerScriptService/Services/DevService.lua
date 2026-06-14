@@ -181,6 +181,12 @@ function DevService.Initialize()
 			player:SetAttribute("TutorialComplete", nil)
 			player:SetAttribute("HasExhibit", nil)
 			player:SetAttribute("LeafCount", 0)
+			player:SetAttribute("UnlockedOutfits", "{}")
+
+			local hasExhibitVal = player:FindFirstChild("HasExhibit")
+			if hasExhibitVal then
+				hasExhibitVal.Value = false
+			end
 
 			-- Clear Tools
 			player.Backpack:ClearAllChildren()
@@ -188,6 +194,17 @@ function DevService.Initialize()
 			if char then
 				for _, tool in ipairs(char:GetChildren()) do
 					if tool:IsA("Tool") then tool:Destroy() end
+				end
+			end
+
+			-- Re-spawn Head Vet from ServerStorage if missing
+			local vet = workspace:FindFirstChild("HeadVet")
+			if not vet then
+				local vetTemplate = ServerStorage:FindFirstChild("HeadVet")
+				if vetTemplate then
+					local newVet = vetTemplate:Clone()
+					newVet.Parent = workspace
+					print("[DevService] Respawned Head Vet from ServerStorage.")
 				end
 			end
 

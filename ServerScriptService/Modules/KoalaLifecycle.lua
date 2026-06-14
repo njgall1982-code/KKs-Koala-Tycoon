@@ -113,7 +113,8 @@ function KoalaLifecycle.SwapModel(oldKoala, newStageName)
 	local hasNamed   = oldKoala:GetAttribute("HasBeenNamed") or false
 	local homeExhibit = oldKoala:GetAttribute("HomeExhibit")
 	local oldPos     = oldKoala:GetPivot()
-	local oldOutfit  = oldKoala:GetAttribute("EquippedOutfit") or ""
+	local oldHat = oldKoala:GetAttribute("EquippedOutfit_Hat") or oldKoala:GetAttribute("EquippedOutfit") or ""
+	local oldNeck = oldKoala:GetAttribute("EquippedOutfit_Necklace") or ""
 
 	-- DEBUG: Log before swap
 	print("[KoalaLifecycle.SwapModel] GROWTH DEBUG:")
@@ -151,15 +152,20 @@ function KoalaLifecycle.SwapModel(oldKoala, newStageName)
 	KoalaLifecycle.InitKoala(newKoala, oldRarity, oldAge)
 	newKoala:SetAttribute("DisplayName", oldName)
 
-	-- Re-equip outfit if this is now an adult
-	if oldOutfit ~= "" then
-		local newStage = newKoala:GetAttribute("Stage") or 1
-		if newStage == 4 then
-			local KoalaOutfitService = require(game:GetService("ServerScriptService").Services.KoalaOutfitService)
-			KoalaOutfitService.EquipOutfit(newKoala, oldOutfit)
-		else
-			newKoala:SetAttribute("EquippedOutfit", nil)
+	-- Re-equip outfits if this is now an adult
+	local newStage = newKoala:GetAttribute("Stage") or 1
+	if newStage == 4 then
+		local KoalaOutfitService = require(game:GetService("ServerScriptService").Services.KoalaOutfitService)
+		if oldHat ~= "" then
+			KoalaOutfitService.EquipOutfit(newKoala, oldHat)
 		end
+		if oldNeck ~= "" then
+			KoalaOutfitService.EquipOutfit(newKoala, oldNeck)
+		end
+	else
+		newKoala:SetAttribute("EquippedOutfit_Hat", nil)
+		newKoala:SetAttribute("EquippedOutfit_Necklace", nil)
+		newKoala:SetAttribute("EquippedOutfit", nil)
 	end
 
 	-- Release Sticky Anchor after a short delay
@@ -194,7 +200,8 @@ function KoalaLifecycle.RespawnAt(oldKoala, pos, parent)
 	local oldName    = oldKoala:GetAttribute("DisplayName") or oldKoala.Name
 	local hasNamed   = oldKoala:GetAttribute("HasBeenNamed") or false
 	local homeExhibit = parent and parent.Name or oldKoala:GetAttribute("HomeExhibit")
-	local oldOutfit  = oldKoala:GetAttribute("EquippedOutfit") or ""
+	local oldHat = oldKoala:GetAttribute("EquippedOutfit_Hat") or oldKoala:GetAttribute("EquippedOutfit") or ""
+	local oldNeck = oldKoala:GetAttribute("EquippedOutfit_Necklace") or ""
 
 	if (oldKoala.Name == "KK" or oldName == "Koala") and not hasNamed then
 		oldName = "KK"
@@ -240,15 +247,20 @@ function KoalaLifecycle.RespawnAt(oldKoala, pos, parent)
 
 	KoalaLifecycle.InitKoala(newKoala, oldRarity, oldAge)
 
-	-- Re-equip outfit if this is an adult
-	if oldOutfit ~= "" then
-		local newStage = newKoala:GetAttribute("Stage") or 1
-		if newStage == 4 then
-			local KoalaOutfitService = require(game:GetService("ServerScriptService").Services.KoalaOutfitService)
-			KoalaOutfitService.EquipOutfit(newKoala, oldOutfit)
-		else
-			newKoala:SetAttribute("EquippedOutfit", nil)
+	-- Re-equip outfits if this is an adult
+	local newStage = newKoala:GetAttribute("Stage") or 1
+	if newStage == 4 then
+		local KoalaOutfitService = require(game:GetService("ServerScriptService").Services.KoalaOutfitService)
+		if oldHat ~= "" then
+			KoalaOutfitService.EquipOutfit(newKoala, oldHat)
 		end
+		if oldNeck ~= "" then
+			KoalaOutfitService.EquipOutfit(newKoala, oldNeck)
+		end
+	else
+		newKoala:SetAttribute("EquippedOutfit_Hat", nil)
+		newKoala:SetAttribute("EquippedOutfit_Necklace", nil)
+		newKoala:SetAttribute("EquippedOutfit", nil)
 	end
 
 	task.delay(3, function()

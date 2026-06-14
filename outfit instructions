@@ -37,6 +37,22 @@ elseif template:IsA("BasePart") then
 	handle = template
 else
 	handle = template.PrimaryPart or template:FindFirstChildOfClass("BasePart")
+	if not handle then
+		-- Fallback: Look deeper recursively for a part or meshpart
+		local function findDeepestPart(parent)
+			if parent:IsA("BasePart") then return parent end
+			for _, child in ipairs(parent:GetChildren()) do
+				local part = findDeepestPart(child)
+				if part then return part end
+			end
+			return nil
+		end
+		handle = findDeepestPart(template)
+		if handle then
+			-- Assign as primary part to resolve subsequent welds
+			template.PrimaryPart = handle
+		end
+	end
 end
 if not handle then error("Outfit must have a PrimaryPart, a child named 'Handle', or be a BasePart/Tool!") end
 
@@ -49,3 +65,4 @@ else
 	template:SetAttribute("AttachOffset", target.CFrame:Inverse() * handle.CFrame)
 	print("Registered part-attached outfit: " .. template.Name)
 end
+

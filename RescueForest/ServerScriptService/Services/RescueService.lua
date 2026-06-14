@@ -208,7 +208,11 @@ function RescueService.RescueJoey(player, joeyInstance)
                         local targetRoot = koala:FindFirstChild("HumanoidRootPart") or koala:FindFirstChildOfClass("Part")
                         if targetRoot then
                             local weldTarget = handle:FindFirstChild("KoalaPos") or handle
-                            koala:PivotTo(weldTarget.CFrame)
+                            if weldTarget:IsA("Attachment") then
+                                koala:PivotTo(weldTarget.WorldCFrame)
+                            else
+                                koala:PivotTo(weldTarget.CFrame)
+                            end
                             
                             for _, p in pairs(koala:GetDescendants()) do
                                 if p:IsA("BasePart") then
@@ -220,7 +224,11 @@ function RescueService.RescueJoey(player, joeyInstance)
                             
                             local weld = Instance.new("WeldConstraint")
                             weld.Name = "CarryWeld"
-                            weld.Part0 = weldTarget
+                            local part0 = weldTarget
+                            if weldTarget:IsA("Attachment") then
+                                part0 = weldTarget.Parent
+                            end
+                            weld.Part0 = part0
                             weld.Part1 = targetRoot
                             weld.Parent = targetRoot
                             koala.Parent = crate

@@ -261,6 +261,28 @@ local function findNearestTree(hrp)
 	return nearestTree
 end
 
+local function findNearestBed(koala)
+	local homePath = koala:GetAttribute("HomeExhibit")
+	local exhibit = homePath and workspace:FindFirstChild(homePath)
+	if not exhibit then return nil end
+
+	local nearestSeat = nil
+	local nearestDist = 50
+	local hrp = koala:FindFirstChild("HumanoidRootPart")
+	if not hrp then return nil end
+
+	for _, obj in ipairs(exhibit:GetDescendants()) do
+		if obj:IsA("Seat") and not obj.Occupant then
+			local dist = (hrp.Position - obj.Position).Magnitude
+			if dist < nearestDist then
+				nearestDist = dist
+				nearestSeat = obj
+			end
+		end
+	end
+	return nearestSeat
+end
+
 -- ============================================================
 -- ANIMATION PROFILES (Cleanly separated per model/rig type!)
 -- ============================================================
@@ -332,6 +354,25 @@ local function animateKoala(state, dt)
 		end
 		return
 	end
+
+	-- Sleep animation override: lie flat on the bed!
+	if state.state == "sleeping" then
+		local bones = state.bones
+		local base = state.baseRotations
+		if bones.hips then
+			bones.hips.CFrame = base.hips * CFrame.Angles(0, 0, math.rad(90))
+		end
+		if bones.frontleg then bones.frontleg.CFrame = base.frontleg end
+		if bones.R_frontleg then bones.R_frontleg.CFrame = base.R_frontleg end
+		if bones.backleg then bones.backleg.CFrame = base.backleg end
+		if bones.R_backleg then bones.R_backleg.CFrame = base.R_backleg end
+		if bones.head then bones.head.CFrame = base.head end
+		
+		if not bones.hips and state.rootWeld then
+			state.rootWeld.C0 = state.baseRootWeldC0 * CFrame.Angles(0, 0, math.rad(90))
+		end
+		return
+	end
 	local velocity = state.hrp.AssemblyLinearVelocity
 	local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 	if speed < 0.1 then
@@ -379,6 +420,30 @@ local function updateWander(state, dt)
 			state.stuckTimer = 0
 		end
 		state.lastPos = state.hrp.Position
+	end
+
+	-- Handle sleeping state
+	if state.state == "sleeping" then
+		state.idleTimer = state.idleTimer - dt
+		
+		-- Sleepy particles/effects
+		if math.random() < 0.02 then
+			local sleepySignal = signals and signals:FindFirstChild("SleepyEffect")
+			if sleepySignal then
+				sleepySignal:Fire(state.koala)
+			end
+		end
+
+		if state.idleTimer <= 0 then
+			-- Wake up!
+			state.humanoid.Sit = false
+			task.wait(0.1)
+			state.hrp.CFrame = state.hrp.CFrame + state.hrp.CFrame.LookVector * -3
+			
+			state.state = "idle"
+			state.idleTimer = math.random(IDLE_TIME_MIN, IDLE_TIME_MAX)
+		end
+		return
 	end
 
 	if state.climbPhase == "approaching" then
@@ -456,26 +521,37 @@ local function updateWander(state, dt)
 				state.idleTimer = 1 
 				return
 			end
-			local tree = findNearestTree(state.hrp)
-			if tree and math.random() < CLIMB_CHANCE then
-				state.isClimbing = true
-				state.climbTarget = tree
-				state.climbPhase = "approaching"
-				state.originalY = state.hrp.Position.Y
-				local trunk = tree:FindFirstChild("Trunk") or tree
-				state.treePos = trunk:GetPivot().Position
-			elseif math.random() < EAT_CHANCE then
-				local homePath = state.koala:GetAttribute("HomeExhibit")
-				local exhibit = homePath and workspace:FindFirstChild(homePath)
-				local feeder = exhibit and exhibit:FindFirstChild("Feeder")
-				if feeder then
-					state.targetPoint = feeder.Position
-					state.state = "wandering"
-					state.isEatingNext = true 
-				end
-			else
-				state.targetPoint = getRandomWanderPoint(state.koala, state.spawnPoint)
+			
+			local SLEEP_CHANCE = 0.05
+			local bed = findNearestBed(state.koala)
+			
+			if bed and math.random() < SLEEP_CHANCE then
+				state.targetPoint = bed.Position
 				state.state = "wandering"
+				state.isSleepingNext = true
+				state.sleepTargetSeat = bed
+			else
+				local tree = findNearestTree(state.hrp)
+				if tree and math.random() < CLIMB_CHANCE then
+					state.isClimbing = true
+					state.climbTarget = tree
+					state.climbPhase = "approaching"
+					state.originalY = state.hrp.Position.Y
+					local trunk = tree:FindFirstChild("Trunk") or tree
+					state.treePos = trunk:GetPivot().Position
+				elseif math.random() < EAT_CHANCE then
+					local homePath = state.koala:GetAttribute("HomeExhibit")
+					local exhibit = homePath and workspace:FindFirstChild(homePath)
+					local feeder = exhibit and exhibit:FindFirstChild("Feeder")
+					if feeder then
+						state.targetPoint = feeder.Position
+						state.state = "wandering"
+						state.isEatingNext = true 
+					end
+				else
+					state.targetPoint = getRandomWanderPoint(state.koala, state.spawnPoint)
+					state.state = "wandering"
+				end
 			end
 		end
 
@@ -491,15 +567,21 @@ local function updateWander(state, dt)
 			state.humanoid:MoveTo(state.targetPoint)
 			local distance = (state.hrp.Position - state.targetPoint).Magnitude
 			state.wanderTimer = (state.wanderTimer or 0) + dt
-			local maxWanderTime = state.isEatingNext and 25 or 12
-			if distance < 2.5 or state.wanderTimer > maxWanderTime then
+			local maxWanderTime = (state.isEatingNext or state.isSleepingNext) and 25 or 12
+			if distance < 3.0 or state.wanderTimer > maxWanderTime then
 				state.wanderTimer = 0
 				state.targetPoint = nil
 				if state.isEatingNext then
 					state.state = "eating"
 					state.idleTimer = 10 
 					state.isEatingNext = false
+				elseif state.isSleepingNext and state.sleepTargetSeat and not state.sleepTargetSeat.Occupant then
+					state.state = "sleeping"
+					state.idleTimer = math.random(15, 30)
+					state.sleepTargetSeat:Sit(state.humanoid)
+					state.isSleepingNext = false
 				else
+					state.isSleepingNext = false
 					state.state = "idle"
 					state.idleTimer = math.random(IDLE_TIME_MIN, IDLE_TIME_MAX)
 				end
@@ -545,6 +627,16 @@ function KoalaSystem.Initialize()
 		for koala, state in pairs(koalaStates) do
 			if koala.Parent then
 				if state == "failed" then continue end
+
+				-- Force wake up if carried or disabled
+				if koala:GetAttribute("IsBeingCarried") or koala:GetAttribute("AI_Disabled") then
+					if state.state == "sleeping" then
+						state.humanoid.Sit = false
+						state.state = "idle"
+						state.idleTimer = 2
+					end
+					state.isSleepingNext = false
+				end
 
 				-- ALWAYS animate koala so head, hips, and limbs maintain their pristine quadruped posture in all states!
 				animateKoala(state, dt)

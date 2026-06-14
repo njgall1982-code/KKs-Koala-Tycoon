@@ -80,9 +80,17 @@ local function openOutfitSelection(koala, parentInspectGui, parentInspectFrame)
 		end
 	end)
 
+	-- Slot tabs container
+	local tabsContainer = Instance.new("Frame", oFrame)
+	tabsContainer.Size = UDim2.new(0.9, 0, 0.12, 0)
+	tabsContainer.Position = UDim2.new(0.05, 0, 0.15, 0)
+	tabsContainer.BackgroundTransparency = 1
+
+	local currentTab = "Hat"
+
 	local scroll = Instance.new("ScrollingFrame", oFrame)
-	scroll.Size = UDim2.new(0.9, 0, 0.7, 0)
-	scroll.Position = UDim2.new(0.05, 0, 0.25, 0)
+	scroll.Size = UDim2.new(0.9, 0, 0.65, 0)
+	scroll.Position = UDim2.new(0.05, 0, 0.3, 0)
 	scroll.BackgroundTransparency = 1
 	scroll.BorderSizePixel = 0
 	scroll.ScrollBarThickness = 6
@@ -93,53 +101,165 @@ local function openOutfitSelection(koala, parentInspectGui, parentInspectFrame)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 	-- Load player's unlocked outfits
-	local unlockedStr = player:GetAttribute("UnlockedOutfits") or "[]"
+	local unlockedStr = player:GetAttribute("UnlockedOutfits") or "{}"
 	local HttpService = game:GetService("HttpService")
+	local OutfitShopConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("OutfitShopConfig"))
 	local unlocked = {}
 	pcall(function()
 		unlocked = HttpService:JSONDecode(unlockedStr)
 	end)
 
-	local currentOutfit = koala:GetAttribute("EquippedOutfit") or ""
+	-- Legacy array migration fallback just in case
+	local isArray = false
+	if unlocked and next(unlocked) ~= nil then
+		if type(next(unlocked)) == "number" then
+			isArray = true
+		end
+	end
+	if isArray then
+		local dict = {}
+		for _, name in ipairs(unlocked) do
+			dict[name] = (dict[name] or 0) + 1
+		end
+		unlocked = dict
+	end
 
-	local function createOutfitOption(name, displayName, isUnequip)
-		local btn = Instance.new("TextButton", scroll)
-		btn.Size = UDim2.new(0.95, 0, 0, 40)
-		btn.Text = displayName
-
-		if (isUnequip and currentOutfit == "") or (not isUnequip and currentOutfit == name) then
-			btn.BackgroundColor3 = Color3.fromRGB(60, 160, 60)
-			btn.Text = displayName .. " (Equipped) ✅"
-		else
-			btn.BackgroundColor3 = Color3.fromRGB(45, 50, 55)
+	local function renderScrollList(slot)
+		-- Clear scroll children (except layout)
+		for _, child in ipairs(scroll:GetChildren()) do
+			if not child:IsA("UIListLayout") then
+				child:Destroy()
+			end
 		end
 
-		btn.TextColor3 = Color3.new(1, 1, 1)
-		btn.Font = Enum.Font.GothamMedium
-		btn.TextSize = 14
-		Instance.new("UICorner", btn)
+		-- Get equipped outfit for this slot
+		local equippedInSlot = koala:GetAttribute("EquippedOutfit_" .. slot)
+		if not equippedInSlot and slot == "Hat" then
+			equippedInSlot = koala:GetAttribute("EquippedOutfit")
+		end
+		equippedInSlot = equippedInSlot or ""
 
-		local stroke = Instance.new("UIStroke", btn)
-		stroke.Color = Color3.new(1, 1, 1)
-		stroke.Transparency = 0.8
-		stroke.Thickness = 1
+		-- Build option list filtered by type
+		local outfitOptions = {}
+		local added = {}
 
-		btn.MouseButton1Click:Connect(function()
-			ReplicatedStorage.EquipOutfitRequest:FireServer(koala, isUnequip and "" or name)
-			oGui:Destroy()
-			if parentInspectGui then
-				parentInspectGui:Destroy()
+		for name, count in pairs(unlocked) do
+			local config = OutfitShopConfig.GetOutfit(name)
+			local itemType = config and config.Type or "Hat"
+			if itemType == slot then
+				if not added[name] then
+					table.insert(outfitOptions, { name = name, count = count })
+					added[name] = true
+				end
 			end
-		end)
+		end
+
+		if equippedInSlot ~= "" and not added[equippedInSlot] then
+			table.insert(outfitOptions, { name = equippedInSlot, count = 0 })
+			added[equippedInSlot] = true
+		end
+
+		table.sort(outfitOptions, function(a, b) return a.name < b.name end)
+
+		local function createOutfitOption(name, displayName, isUnequip, availableCount)
+			local btn = Instance.new("TextButton", scroll)
+			btn.Size = UDim2.new(0.95, 0, 0, 40)
+			btn.Text = displayName
+
+			local isEquipped = (isUnequip and equippedInSlot == "") or (not isUnequip and equippedInSlot == name)
+			local isSelectable = isUnequip or isEquipped or (availableCount and availableCount > 0)
+
+			if isEquipped then
+				btn.BackgroundColor3 = Color3.fromRGB(60, 160, 60)
+				btn.Text = displayName .. " (Equipped) ✅"
+			elseif isSelectable then
+				btn.BackgroundColor3 = Color3.fromRGB(45, 50, 55)
+			else
+				btn.BackgroundColor3 = Color3.fromRGB(28, 30, 33)
+				btn.TextColor3 = Color3.fromRGB(120, 120, 120)
+			end
+
+			btn.TextColor3 = isSelectable and Color3.new(1, 1, 1) or Color3.fromRGB(120, 120, 120)
+			btn.Font = Enum.Font.GothamMedium
+			btn.TextSize = 14
+			Instance.new("UICorner", btn)
+
+			local stroke = Instance.new("UIStroke", btn)
+			stroke.Color = isSelectable and Color3.new(1, 1, 1) or Color3.fromRGB(60, 60, 60)
+			stroke.Transparency = 0.8
+			stroke.Thickness = 1
+
+			if isSelectable then
+				btn.MouseButton1Click:Connect(function()
+					ReplicatedStorage.EquipOutfitRequest:FireServer(koala, isUnequip and "" or name, slot)
+					oGui:Destroy()
+					if parentInspectGui then
+						parentInspectGui:Destroy()
+					end
+				end)
+			else
+				btn.Active = false
+			end
+		end
+
+		createOutfitOption("", "❌ Remove " .. (slot == "Hat" and "Headwear" or "Necklace"), true)
+
+		for _, opt in ipairs(outfitOptions) do
+			local config = OutfitShopConfig.GetOutfit(opt.name)
+			local displayTitle = config and config.DisplayName or opt.name
+			local display = string.format("%s (Available: %d)", displayTitle, opt.count)
+			createOutfitOption(opt.name, display, false, opt.count)
+		end
+
+		scroll.CanvasSize = UDim2.new(0, 0, 0, (#outfitOptions + 1) * 48)
 	end
 
-	createOutfitOption("", "❌ Remove Outfit", true)
+	-- Create Tab Buttons
+	local tabHat = Instance.new("TextButton", tabsContainer)
+	tabHat.Size = UDim2.new(0.48, 0, 1, 0)
+	tabHat.Position = UDim2.new(0, 0, 0, 0)
+	tabHat.Text = "🎩 Headwear"
+	tabHat.Font = Enum.Font.GothamBold
+	tabHat.TextSize = 12
+	Instance.new("UICorner", tabHat)
 
-	for _, outfitName in ipairs(unlocked) do
-		createOutfitOption(outfitName, outfitName, false)
+	local tabNeck = Instance.new("TextButton", tabsContainer)
+	tabNeck.Size = UDim2.new(0.48, 0, 1, 0)
+	tabNeck.Position = UDim2.new(0.52, 0, 0, 0)
+	tabNeck.Text = "💖 Neckwear"
+	tabNeck.Font = Enum.Font.GothamBold
+	tabNeck.TextSize = 12
+	Instance.new("UICorner", tabNeck)
+
+	local function updateTabVisuals()
+		if currentTab == "Hat" then
+			tabHat.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+			tabHat.TextColor3 = Color3.new(1, 1, 1)
+			tabNeck.BackgroundColor3 = Color3.fromRGB(35, 40, 45)
+			tabNeck.TextColor3 = Color3.fromRGB(180, 180, 180)
+		else
+			tabNeck.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+			tabNeck.TextColor3 = Color3.new(1, 1, 1)
+			tabHat.BackgroundColor3 = Color3.fromRGB(35, 40, 45)
+			tabHat.TextColor3 = Color3.fromRGB(180, 180, 180)
+		end
 	end
 
-	scroll.CanvasSize = UDim2.new(0, 0, 0, (#unlocked + 1) * 48)
+	tabHat.MouseButton1Click:Connect(function()
+		currentTab = "Hat"
+		updateTabVisuals()
+		renderScrollList("Hat")
+	end)
+
+	tabNeck.MouseButton1Click:Connect(function()
+		currentTab = "Necklace"
+		updateTabVisuals()
+		renderScrollList("Necklace")
+	end)
+
+	-- Initial load
+	updateTabVisuals()
+	renderScrollList("Hat")
 end
 
 -- RENAME EXHIBIT

@@ -75,7 +75,9 @@ function DataStore.SaveData(player)
 				Rarity = stats:FindFirstChild("Rarity") and stats.Rarity.Value or "Cute",
 				Age = stats:FindFirstChild("Age") and stats.Age.Value or 0,
 				HomeExhibit = home,
-				Outfit = koala:GetAttribute("EquippedOutfit") or ""
+				Outfit = koala:GetAttribute("EquippedOutfit") or "",
+				Outfit_Hat = koala:GetAttribute("EquippedOutfit_Hat") or "",
+				Outfit_Necklace = koala:GetAttribute("EquippedOutfit_Necklace") or ""
 			})
 		else
 			print("[DataStore] ⚠️ Skipping Koala " .. koala.Name .. " (No Stats or HomeExhibit)")
@@ -118,7 +120,22 @@ function DataStore.LoadData(player)
 		player:SetAttribute("MilkBottles", result.MilkBottles or 0)
 		player:SetAttribute("RescuedKoalas", HttpService:JSONEncode(result.RescuedKoalas or {}))
 		player:SetAttribute("MaxLeaves", result.MaxLeaves or 5)
-		player:SetAttribute("UnlockedOutfits", HttpService:JSONEncode(result.UnlockedOutfits or {}))
+
+		local unlockedOutfits = result.UnlockedOutfits or {}
+		local isArray = false
+		if unlockedOutfits and next(unlockedOutfits) ~= nil then
+			if type(next(unlockedOutfits)) == "number" then
+				isArray = true
+			end
+		end
+		if isArray then
+			local dict = {}
+			for _, name in ipairs(unlockedOutfits) do
+				dict[name] = (dict[name] or 0) + 1
+			end
+			unlockedOutfits = dict
+		end
+		player:SetAttribute("UnlockedOutfits", HttpService:JSONEncode(unlockedOutfits))
 		
 		local tycoonKoalas = result.Koalas or {}
 		local pendingKoalas = result.RescuedKoalas or {}
@@ -244,6 +261,8 @@ function DataStore.LoadData(player)
 						dummy.Name = kData.Name
 						dummy:SetAttribute("DisplayName", kData.DisplayName)
 						dummy:SetAttribute("EquippedOutfit", kData.Outfit or "")
+						dummy:SetAttribute("EquippedOutfit_Hat", kData.Outfit_Hat or kData.Outfit or "")
+						dummy:SetAttribute("EquippedOutfit_Necklace", kData.Outfit_Necklace or "")
 
 						local stats = Instance.new("Folder", dummy)
 						stats.Name = "KoalaStats"

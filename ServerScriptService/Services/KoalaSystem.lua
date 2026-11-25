@@ -76,12 +76,18 @@ local function initKoala(koala)
 		R_backleg = findBone(rigRoot, "R_backleg"),
 	}
 
-	if hrp then hrp.CanCollide = true end
+	if hrp then 
+		hrp.CanCollide = true 
+		hrp.CollisionGroup = "Koalas"
+	end
 	for _, part in ipairs(koala:GetDescendants()) do
-		if part:IsA("BasePart") and part ~= hrp then
-			part.CanCollide = false
-			part.CanTouch = false
-			part.CanQuery = true 
+		if part:IsA("BasePart") then
+			part.CollisionGroup = "Koalas"
+			if part ~= hrp then
+				part.CanCollide = false
+				part.CanTouch = false
+				part.CanQuery = true 
+			end
 		end
 	end
 
@@ -407,6 +413,82 @@ local function animateKoala(state, dt)
 end
 
 local function updateWander(state, dt)
+	-- Handle Player Following
+	local followingName = state.koala:GetAttribute("FollowingPlayer")
+	if followingName and followingName ~= "" then
+		local Players = game:GetService("Players")
+		local targetPlayer = Players:FindFirstChild(followingName)
+		local targetChar = targetPlayer and targetPlayer.Character
+		local targetHrp = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+		local targetHum = targetChar and targetChar:FindFirstChild("Humanoid")
+
+		if targetHrp and targetHum and targetHum.Health > 0 then
+			-- Interrupt climbing or sleeping if player asks koala to follow
+			if state.state == "sleeping" then
+				state.humanoid.Sit = false
+				state.state = "idle"
+			end
+			if state.isClimbing then
+				state.climbPhase = nil
+				state.isClimbing = false
+				state.humanoid.PlatformStand = false
+				state.hrp.Anchored = false
+				state.humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+			end
+
+			local myPos = state.hrp.Position
+			local destPos = targetHrp.Position
+			local flatDist = (Vector3.new(destPos.X, 0, destPos.Z) - Vector3.new(myPos.X, 0, myPos.Z)).Magnitude
+
+			-- Catch-up / Fence bypass: If player gets > 25 studs away OR koala gets stuck on a fence for > 2s
+			local distMoved = (myPos - (state.lastFollowPos or myPos)).Magnitude
+			if flatDist > 6 and distMoved < 0.2 then
+				state.followStuckTimer = (state.followStuckTimer or 0) + dt
+			else
+				state.followStuckTimer = 0
+			end
+			state.lastFollowPos = myPos
+
+			if flatDist > 25 or (state.followStuckTimer and state.followStuckTimer > 2.0) then
+				state.followStuckTimer = 0
+				local offset = -targetHrp.CFrame.LookVector * 3.5 + targetHrp.CFrame.RightVector * 2
+				local rayOrigin = targetHrp.Position + offset + Vector3.new(0, 5, 0)
+				local rayParams = RaycastParams.new()
+				rayParams.FilterDescendantsInstances = {state.koala, targetChar}
+				rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+				local rayResult = workspace:Raycast(rayOrigin, Vector3.new(0, -20, 0), rayParams)
+				local targetSpawnPos = rayResult and rayResult.Position or (targetHrp.Position + offset)
+
+				state.koala:PivotTo(CFrame.new(targetSpawnPos, targetSpawnPos + targetHrp.CFrame.LookVector))
+				state.hrp.AssemblyLinearVelocity = Vector3.zero
+				state.humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+				state.humanoid.WalkSpeed = WALK_SPEED
+				state.state = "idle"
+				return
+			end
+
+			if flatDist > 6 then
+				-- Walk towards player slightly faster than base waddle so it can keep up
+				state.humanoid.WalkSpeed = 10
+				state.state = "wandering"
+				state.targetPoint = destPos
+				state.humanoid:MoveTo(destPos)
+			else
+				-- Close enough to player: stop and idle near player
+				state.humanoid.WalkSpeed = WALK_SPEED
+				state.state = "idle"
+				state.targetPoint = nil
+				state.humanoid:MoveTo(myPos)
+			end
+			return
+		else
+			-- Target player left or died: clear following attribute
+			state.koala:SetAttribute("FollowingPlayer", nil)
+			state.humanoid.WalkSpeed = WALK_SPEED
+		end
+	end
+
 	if state.state == "walking" then
 		local distMoved = (state.hrp.Position - state.lastPos).Magnitude
 		if distMoved < 0.1 then
@@ -522,7 +604,7 @@ local function updateWander(state, dt)
 				return
 			end
 			
-			local SLEEP_CHANCE = 0.05
+			local SLEEP_CHANCE = 0.25
 			local bed = findNearestBed(state.koala)
 			
 			if bed and math.random() < SLEEP_CHANCE then

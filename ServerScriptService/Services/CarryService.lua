@@ -214,12 +214,12 @@ function CarryService.Drop(player, dropCFrame, explicitExhibitName)
 				return false
 			end
 
-			-- Capacity Check
+			-- Capacity Check (exclude the koala currently being dropped)
 			local maxKoalas = dropParent:GetAttribute("MaxKoalas") or 10
 			local currentKoalas = 0
 			local CollectionService = game:GetService("CollectionService")
 			for _, child in ipairs(dropParent:GetChildren()) do
-				if child:IsA("Model") and CollectionService:HasTag(child, "KoalaNPC") then
+				if child ~= targetModel and child:IsA("Model") and CollectionService:HasTag(child, "KoalaNPC") then
 					currentKoalas += 1
 				end
 			end

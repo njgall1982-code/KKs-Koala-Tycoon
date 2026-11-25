@@ -79,10 +79,10 @@ local function createShopGui()
 	closeBtn.Size = UDim2.new(0, 36, 0, 36)
 	closeBtn.Position = UDim2.new(1, -46, 0, 10)
 	closeBtn.BackgroundColor3 = Color3.fromRGB(40, 39, 46)
-	closeBtn.Text = "✕"
+	closeBtn.Text = "X"
 	closeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
 	closeBtn.Font = Enum.Font.GothamBold
-	closeBtn.TextSize = 14
+	closeBtn.TextSize = 16
 	closeBtn.Parent = mainFrame
 
 	local closeCorner = Instance.new("UICorner")

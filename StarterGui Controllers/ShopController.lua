@@ -37,10 +37,29 @@ local function findTitleLabel(card)
     return nil
 end
 
+local function findIconLabel(card)
+    local names = {"Icon", "ToolIcon", "ItemIcon"}
+    for _, name in ipairs(names) do
+        local found = card:FindFirstChild(name)
+        if found and (found:IsA("TextLabel") or found:IsA("ImageLabel")) then
+            return found
+        end
+    end
+    return nil
+end
+
 local function findDescLabel(card)
+    local names = {"Description", "Desc", "Subtitle", "Info"}
+    for _, name in ipairs(names) do
+        local found = card:FindFirstChild(name)
+        if found and found:IsA("TextLabel") then
+            return found
+        end
+    end
     local title = findTitleLabel(card)
+    local icon = findIconLabel(card)
     for _, child in ipairs(card:GetChildren()) do
-        if child:IsA("TextLabel") and child ~= title then
+        if child:IsA("TextLabel") and child ~= title and child ~= icon and child.Name ~= "Price" then
             return child
         end
     end
@@ -57,16 +76,18 @@ local function updateFeedBagCard(card)
 
 	buyBtn:SetAttribute("Price", nextPrice)
 	buyBtn:SetAttribute("ToolName", "FeedBagUpgrade")
-	
-	local originalText = buyBtn.Text
-	if originalText:find("Buy") or originalText:find("%$") then
-		if originalText:find("Buy") then
-			buyBtn.Text = "Buy ($" .. nextPrice .. ")"
-		else
-			buyBtn.Text = "$" .. nextPrice
-		end
-	else
-		buyBtn.Text = "$" .. nextPrice
+	buyBtn.Text = "BUY"
+	buyBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+	buyBtn.Active = true
+
+	local priceLabel = card:FindFirstChild("Price")
+	if priceLabel and priceLabel:IsA("TextLabel") then
+		priceLabel.Text = "$" .. nextPrice
+	end
+
+	local iconLabel = findIconLabel(card)
+	if iconLabel and iconLabel:IsA("TextLabel") then
+		iconLabel.Text = "🎒"
 	end
 
 	local titleLabel = findTitleLabel(card)
@@ -76,18 +97,18 @@ local function updateFeedBagCard(card)
 
 	local descLabel = findDescLabel(card)
 	if descLabel then
-		descLabel.Text = string.format("Holds %d leaves (+5)", maxLeaves + 5)
+		descLabel.Text = string.format("Holds food to feed koalas! Capacity: %d (+5)", maxLeaves + 5)
 	end
 end
 
 local function updateMilkBottleCard()
 	if not toolContainer then return end
-	local card = toolContainer:FindFirstChild("MilkBottle")
+	local card = toolContainer:FindFirstChild("MilkBottle") or toolContainer:FindFirstChild("MilkBottleCard")
 	if not card then
 		for _, child in ipairs(toolContainer:GetChildren()) do
 			if child:IsA("Frame") then
 				local buyBtn = child:FindFirstChild("BuyButton")
-				if buyBtn and buyBtn:GetAttribute("ToolName") == "MilkBottle" then
+				if buyBtn and (buyBtn:GetAttribute("ToolName") == "MilkBottle" or child.Name:find("Milk")) then
 					card = child
 					break
 				end
@@ -104,17 +125,14 @@ local function updateMilkBottleCard()
 	local nextPrice = KoalaConfig.GetMilkBottlePrice(ownedCount)
 
 	buyBtn:SetAttribute("Price", nextPrice)
-	
-	-- Update Buy Button Text
-	local originalText = buyBtn.Text
-	if originalText:find("Buy") or originalText:find("%$") then
-		if originalText:find("Buy") then
-			buyBtn.Text = "Buy ($" .. nextPrice .. ")"
-		else
-			buyBtn.Text = "$" .. nextPrice
-		end
-	else
-		buyBtn.Text = "$" .. nextPrice
+	buyBtn:SetAttribute("ToolName", "MilkBottle")
+	buyBtn.Text = "BUY"
+	buyBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+	buyBtn.Active = true
+
+	local priceLabel = card:FindFirstChild("Price")
+	if priceLabel and priceLabel:IsA("TextLabel") then
+		priceLabel.Text = "$" .. nextPrice
 	end
 end
 

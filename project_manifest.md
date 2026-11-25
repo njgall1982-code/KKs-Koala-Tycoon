@@ -1,8 +1,11 @@
 # 🐨 Koala Tycoon: Project Manifest
 **Last Updated: May 3, 2026**
 
-### 🏆 Current Milestone: Tutorial & AI Stability (Phase 2 - COMPLETED)
-We have successfully implemented the "Rescue KK" tutorial and refined the NPC AI into a stable, "real-feeling" behavior loop.
+### 🏆 Current Milestone: Rescue Forest, Lifecycle & Outfits (Phases 1-3 - COMPLETED)
+We have completed:
+1. **Phase 1: Tutorial ("The Handyman's Debt")** - Fence repair, leaf gathering, feeder stocking, releasing KK.
+2. **Phase 2: Rescue Forest & Gacha System** - Milk bottle economy, forest teleportation, wild joey gacha roll (90/8/2%), rarity visuals.
+3. **Phase 3: Lifecycle & Growth** - 5-stage growth (Newborn to Adult), 1.5x cuddle speed multiplier, and full Outfit & Accessory equipping system.
 
 ### 🛠️ Core Technical Pillars (Lessons Learned)
 
@@ -68,10 +71,12 @@ PRIMARY: The local folder is the absolute Source of Truth for all scripts/files.
 4.  **No Regression Search**: Before modifying functions or scripts, the AI must search the codebase for references to those symbols or systems to ensure no external dependencies are broken.
 5.  **Health Checks**: If a system fails, use the MCP tools to inspect the Explorer hierarchy and check if instances exist and have correct attributes/properties.
 
-### 📅 Next Session Goals
-1.
-2. **Happiness System**: Expand the "Hunger" loop into a full "Happiness" meter that impacts the tycoon's income.
-3. **The Store**: Implement the leaf-collection store loop.
+### 📅 Next Session Goals (Phase 4: Economy & Revenue Engine)
+1. **Multi-Factor Revenue Calculation**: Overhaul `RevenueService` so exhibit income scales with:
+   - **Happiness Meter**: Starving/unhappy koalas reduce or pause exhibit income.
+   - **Rarity Multiplier**: Cute (1x), Super Cute (2x), Legendary (5x).
+   - **Outfit / Style Bonus**: Koalas wearing unlocked hats/outfits grant visitor tip bonuses.
+2. **Tycoon Progression Tree**: Implement cash unlocks for new exhibits, feeder expansions, and zoo facilities.
 
 
 NewKK is the model we're using for normal Koalas.  

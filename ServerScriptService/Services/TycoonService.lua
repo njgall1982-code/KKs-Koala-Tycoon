@@ -147,9 +147,10 @@ function TycoonService.HandleRepair(player, exhibit, part, toolRequired)
 		TycoonService.UpdateStatus(player, "✅ Repaired " .. part.Name .. "!")
 
 		-- Visual Repair
-		if part.Name == "BrokenFence" then
+		if part.Name == "BrokenFence" or part.Name:find("Gate") then
 			part.Transparency = 0
 			part.CanCollide = true
+			part.CollisionGroup = "ExhibitGates"
 			for _, child in pairs(part:GetChildren()) do
 				if child.Name:find("Visual") or child.Name:find("Broken") then
 					child:Destroy()
@@ -209,11 +210,12 @@ function TycoonService.InitializePlayer(player)
 			end
 
 			if exhibit:GetAttribute("IsRepaired") then
-				-- Restore Fence
-				local fence = exhibit:FindFirstChild("BrokenFence")
+				-- Restore Fence / Gate
+				local fence = exhibit:FindFirstChild("BrokenFence") or exhibit:FindFirstChild("Gate") or exhibit:FindFirstChild("ExhibitGate")
 				if fence then
 					fence.Transparency = 0
 					fence.CanCollide = true
+					fence.CollisionGroup = "ExhibitGates"
 					local p = fence:FindFirstChildOfClass("ProximityPrompt")
 					if p then p:Destroy() end
 					

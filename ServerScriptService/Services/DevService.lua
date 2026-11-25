@@ -227,10 +227,11 @@ function DevService.Initialize()
 			local ex = workspace:FindFirstChild("TutorialExhibit_Workspace")
 			if ex then
 				ex:SetAttribute("IsRepaired", true)
-				local fence = ex:FindFirstChild("BrokenFence")
+				local fence = ex:FindFirstChild("BrokenFence") or ex:FindFirstChild("Gate") or ex:FindFirstChild("ExhibitGate")
 				if fence then
 					fence.Transparency = 0
 					fence.CanCollide = true
+					fence.CollisionGroup = "ExhibitGates"
 				end
 			end
 			TycoonService.UpdateStatus(player, "⚡ Skipped Tutorial & Repaired Exhibit!")

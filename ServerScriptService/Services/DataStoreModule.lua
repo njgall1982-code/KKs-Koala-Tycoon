@@ -22,6 +22,18 @@ function DataStore.SaveData(player)
 		unlockedDecoded = HttpService:JSONDecode(unlockedAttr)
 	end)
 
+	local unlockedTelemetryAttr = player:GetAttribute("UnlockedTelemetry") or "{}"
+	local unlockedTelemetryDecoded = {}
+	pcall(function()
+		unlockedTelemetryDecoded = HttpService:JSONDecode(unlockedTelemetryAttr)
+	end)
+
+	local unlockedDiagnosticsAttr = player:GetAttribute("UnlockedDiagnostics") or "{}"
+	local unlockedDiagnosticsDecoded = {}
+	pcall(function()
+		unlockedDiagnosticsDecoded = HttpService:JSONDecode(unlockedDiagnosticsAttr)
+	end)
+
 	local data = {
 		Cash = leaderstats.Cash.Value,
 		Conservation = leaderstats.Conservation.Value,
@@ -31,7 +43,10 @@ function DataStore.SaveData(player)
 		MilkBottles = player:GetAttribute("MilkBottles") or 0,
 		RescuedKoalas = rescuedDecoded,
 		MaxLeaves = player:GetAttribute("MaxLeaves") or 5,
-		UnlockedOutfits = unlockedDecoded
+		UnlockedOutfits = unlockedDecoded,
+		ZooComputerUnlocked = player:GetAttribute("ZooComputerUnlocked") or false,
+		UnlockedTelemetry = unlockedTelemetryDecoded,
+		UnlockedDiagnostics = unlockedDiagnosticsDecoded
 	}
 
 	local ownedTools = player:FindFirstChild("OwnedTools")
@@ -136,6 +151,9 @@ function DataStore.LoadData(player)
 			unlockedOutfits = dict
 		end
 		player:SetAttribute("UnlockedOutfits", HttpService:JSONEncode(unlockedOutfits))
+		player:SetAttribute("ZooComputerUnlocked", result.ZooComputerUnlocked or false)
+		player:SetAttribute("UnlockedTelemetry", HttpService:JSONEncode(result.UnlockedTelemetry or {}))
+		player:SetAttribute("UnlockedDiagnostics", HttpService:JSONEncode(result.UnlockedDiagnostics or {}))
 		
 		local tycoonKoalas = result.Koalas or {}
 		local pendingKoalas = result.RescuedKoalas or {}

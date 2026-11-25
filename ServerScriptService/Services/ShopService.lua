@@ -45,31 +45,29 @@ function ShopService.Initialize()
     if ShopService._initialized then return end
     ShopService._initialized = true
 
-    local function connectToolShed(toolShed)
-        if not toolShed or toolShed.Name ~= "ToolShed" then return end
-        if connections[toolShed] then return end
-        
-        local prompt = toolShed:FindFirstChildWhichIsA("ProximityPrompt", true)
-        if prompt then
-            print("[ShopService] Connected to ToolShed at: " .. toolShed:GetFullName())
-            connections[toolShed] = prompt.Triggered:Connect(function(player)
-                ShopService.OpenShop(player)
-            end)
-            
-            toolShed.Destroying:Connect(function()
-                if connections[toolShed] then
-                    connections[toolShed]:Disconnect()
-                    connections[toolShed] = nil
-                end
-            end)
-        end
+    local function connectPrompt(prompt)
+        if not prompt:IsA("ProximityPrompt") then return end
+        if prompt.Name ~= "OpenShopPrompt" and not (prompt.ObjectText and prompt.ObjectText:lower():find("tool")) then return end
+        if connections[prompt] then return end
+
+        print("[ShopService] Connected to Tool Shop prompt at: " .. prompt:GetFullName())
+        connections[prompt] = prompt.Triggered:Connect(function(player)
+            ShopService.OpenShop(player)
+        end)
+
+        prompt.Destroying:Connect(function()
+            if connections[prompt] then
+                connections[prompt]:Disconnect()
+                connections[prompt] = nil
+            end
+        end)
     end
 
     for _, desc in pairs(workspace:GetDescendants()) do
-        connectToolShed(desc)
+        connectPrompt(desc)
     end
-    workspace.DescendantAdded:Connect(connectToolShed)
-    
+    workspace.DescendantAdded:Connect(connectPrompt)
+
     -- Purchase Handler
     purchaseEvent.OnServerEvent:Connect(function(player, toolName, price)
         ShopService.HandlePurchaseRequest(player, toolName, price)

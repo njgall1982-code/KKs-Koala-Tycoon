@@ -77,11 +77,27 @@ function KoalaOutfitService.EquipOutfit(koala, outfitName)
 	local outfitModel = template:Clone()
 	outfitModel.Name = "EquippedOutfitModel_" .. slot
 
+	-- Convert Accessory to Model and strip default avatar tags so Roblox Humanoid
+	-- doesn't auto-rescale or auto-weld accessories on custom rigs
+	if outfitModel:IsA("Accessory") then
+		local newModel = Instance.new("Model")
+		newModel.Name = outfitModel.Name
+		for attrName, attrVal in pairs(outfitModel:GetAttributes()) do
+			newModel:SetAttribute(attrName, attrVal)
+		end
+		for _, child in ipairs(outfitModel:GetChildren()) do
+			child.Parent = newModel
+		end
+		outfitModel:Destroy()
+		outfitModel = newModel
+	end
+
 	local handle = nil
-	if outfitModel:IsA("Accessory") or outfitModel:IsA("Tool") then
+	if outfitModel:IsA("Tool") then
 		handle = outfitModel:FindFirstChild("Handle")
 	elseif outfitModel:IsA("Model") then
-		handle = outfitModel.PrimaryPart or outfitModel:FindFirstChildOfClass("BasePart")
+		handle = outfitModel.PrimaryPart or outfitModel:FindFirstChild("Handle") or outfitModel:FindFirstChildOfClass("BasePart")
+		if handle then outfitModel.PrimaryPart = handle end
 	elseif outfitModel:IsA("BasePart") then
 		handle = outfitModel
 	end
@@ -90,6 +106,13 @@ function KoalaOutfitService.EquipOutfit(koala, outfitName)
 		warn("[KoalaOutfitService] Outfit template has no valid handle (PrimaryPart/Handle/BasePart): " .. outfitName)
 		outfitModel:Destroy()
 		return
+	end
+
+	-- Strip avatar scaling / weld tags from handle
+	for _, desc in ipairs(handle:GetChildren()) do
+		if desc.Name == "OriginalSize" or desc.Name == "AvatarPartScaleType" or desc.Name == "HatAttachment" or desc.Name == "AccessoryWeld" then
+			desc:Destroy()
+		end
 	end
 
 	local attachPartName = outfitModel:GetAttribute("AttachPart") or "head"

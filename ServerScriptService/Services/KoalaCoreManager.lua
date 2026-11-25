@@ -26,8 +26,20 @@ function KoalaCoreManager.Initialize()
 		if not targetKoala or not targetKoala:IsDescendantOf(workspace) then return end
 
 		if action == "Cuddle" then
-			targetKoala:SetAttribute("LastCuddleTime", workspace:GetServerTimeNow())
-			print("[KoalaCoreManager] " .. player.Name .. " cuddled " .. targetKoala.Name)
+			local now = workspace:GetServerTimeNow()
+			targetKoala:SetAttribute("LastCuddleTime", now)
+
+			local stats = targetKoala:FindFirstChild("KoalaStats")
+			if stats then
+				local cuddleVal = stats:FindFirstChild("LastCuddleTime")
+				if not cuddleVal then
+					cuddleVal = Instance.new("NumberValue", stats)
+					cuddleVal.Name = "LastCuddleTime"
+				end
+				cuddleVal.Value = now
+			end
+
+			print("[KoalaCoreManager] " .. player.Name .. " cuddled " .. targetKoala.Name .. " at " .. tostring(now))
 
 			-- Show Heart Emoji Effect
 			KoalaVFX.ShowHeartEffect(targetKoala)

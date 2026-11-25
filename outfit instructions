@@ -1,68 +1,100 @@
 -- KK's Koala Tycoon: Outfit & Accessory Registration Utility
 --
--- SETUP INSTRUCTIONS:
--- 1. Create a Folder named 'KoalaOutfits' in ReplicatedStorage.
--- 2. Place your outfit (Model or Accessory) perfectly onto an Adult Koala in the Workspace.
--- 3. Select the outfit in the Explorer.
--- 4. Copy-paste this entire script into the Studio Command Bar (View -> Command Bar) and press Enter.
--- 5. The script will calculate the offset, add attributes, and save a clean copy in ReplicatedStorage.KoalaOutfits.
--- 6. Once saved, you can delete the visual editing copy from the Workspace!
+-- ============================================================
+-- HOW TO FIT & REGISTER AN OUTFIT
+-- ============================================================
+-- 1. In Workspace, make sure your Adult Koala model is named 'Koala'.
+-- 2. Place your outfit (Accessory or Model or Part) on top of the Koala's head.
+--    Use Studio's Move, Rotate, and Scale tools until it looks just right.
+-- 3. Select the outfit in the Explorer window.
+-- 4. Paste the script below into the Studio Command Bar (View -> Command Bar) and hit Enter.
+-- 5. The script will:
+--      - Calculate the exact attachment to the head bone.
+--      - Automatically convert Accessories to clean Models (preventing Roblox Humanoid auto-scale bugs).
+--      - Save the clean template in ReplicatedStorage.KoalaOutfits.
+--      - Instantly perform a test equip on your Koala so you can verify the fit!
+-- 6. If the fit looks good, delete your temporary editing outfit from Workspace.
 --
--- RUN SCRIPT BELOW IN COMMAND BAR:
+-- ============================================================
+-- RUN SCRIPT BELOW IN STUDIO COMMAND BAR:
+-- ============================================================
 local Selection = game:GetService("Selection")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
+
 local selected = Selection:Get()[1]
 if not selected or not (selected:IsA("Model") or selected:IsA("Accessory") or selected:IsA("BasePart") or selected:IsA("Tool")) then
-	error("Select the Outfit Model, Accessory, Part, or Tool in Explorer first!")
+	error("Please select the Outfit (Accessory/Model/Part) in Explorer first!")
 end
+
+-- Smart detect: if user clicked 'Handle' inside the hat, target the hat itself
+if selected.Name == "Handle" and (selected.Parent:IsA("Accessory") or selected.Parent:IsA("Model")) then
+	selected = selected.Parent
+end
+
 local koala = workspace:FindFirstChild("Koala") or workspace:FindFirstChildOfClass("Model")
-if not koala then error("Place an Adult Koala model in Workspace to align relative to.") end
-local attachPartName = "head" -- Attach to head bone
-local target = koala:FindFirstChild(attachPartName, true)
-if not target then
-	target = koala:FindFirstChild("HumanoidRootPart")
-	attachPartName = "HumanoidRootPart"
-	warn("head bone not found. Defaulting to HumanoidRootPart.")
-end
+if not koala then error("Ensure an adult koala named 'Koala' is in Workspace.") end
+
+local target = koala:FindFirstChild("head", true) or koala:FindFirstChild("HumanoidRootPart")
 local folder = ReplicatedStorage:FindFirstChild("KoalaOutfits") or Instance.new("Folder", ReplicatedStorage)
 folder.Name = "KoalaOutfits"
-local template = selected:Clone()
-template.Parent = folder
-template:SetAttribute("AttachPart", attachPartName)
 
-local handle = nil
-if template:IsA("Accessory") or template:IsA("Tool") then
-	handle = template:FindFirstChild("Handle")
-elseif template:IsA("BasePart") then
-	handle = template
+local existing = folder:FindFirstChild(selected.Name)
+if existing then existing:Destroy() end
+
+-- Find source handle
+local selHandle = nil
+if selected:IsA("Accessory") or selected:IsA("Tool") then
+	selHandle = selected:FindFirstChild("Handle")
+elseif selected:IsA("BasePart") then
+	selHandle = selected
 else
-	handle = template.PrimaryPart or template:FindFirstChildOfClass("BasePart")
-	if not handle then
-		-- Fallback: Look deeper recursively for a part or meshpart
-		local function findDeepestPart(parent)
-			if parent:IsA("BasePart") then return parent end
-			for _, child in ipairs(parent:GetChildren()) do
-				local part = findDeepestPart(child)
-				if part then return part end
-			end
-			return nil
+	selHandle = selected.PrimaryPart or selected:FindFirstChild("Handle") or selected:FindFirstChildOfClass("BasePart")
+end
+
+if not selHandle then error("Outfit must have a Handle or PrimaryPart!") end
+
+-- Convert Accessories to clean Models to avoid Roblox Humanoid auto-scaling / floating bugs
+local template = nil
+local templateHandle = nil
+if selected:IsA("Accessory") then
+	template = Instance.new("Model")
+	template.Name = selected.Name
+	for attr, val in pairs(selected:GetAttributes()) do template:SetAttribute(attr, val) end
+	for _, child in ipairs(selected:GetChildren()) do
+		local c = child:Clone()
+		c.Parent = template
+		if c.Name == "Handle" then
+			templateHandle = c
+			template.PrimaryPart = c
 		end
-		handle = findDeepestPart(template)
-		if handle then
-			-- Assign as primary part to resolve subsequent welds
-			template.PrimaryPart = handle
+	end
+else
+	template = selected:Clone()
+	templateHandle = template.PrimaryPart or template:FindFirstChild("Handle") or (template:IsA("BasePart") and template)
+end
+
+template.Parent = folder
+template:SetAttribute("AttachPart", "head")
+
+-- Strip Roblox avatar scaling / weld tags
+if templateHandle then
+	for _, desc in ipairs(templateHandle:GetChildren()) do
+		if desc.Name == "OriginalSize" or desc.Name == "AvatarPartScaleType" or desc.Name == "HatAttachment" or desc.Name == "AccessoryWeld" or desc.Name == "Attach" then
+			desc:Destroy()
 		end
 	end
 end
-if not handle then error("Outfit must have a PrimaryPart, a child named 'Handle', or be a BasePart/Tool!") end
 
-if target:IsA("Bone") or target:IsA("Attachment") then
-	local attach = handle:FindFirstChild("Attach") or Instance.new("Attachment", handle)
-	attach.Name = "Attach"
-	attach.CFrame = handle.CFrame:Inverse() * target.WorldCFrame
-	print("Registered bone-attached outfit: " .. template.Name)
-else
-	template:SetAttribute("AttachOffset", target.CFrame:Inverse() * handle.CFrame)
-	print("Registered part-attached outfit: " .. template.Name)
-end
+local attach = Instance.new("Attachment")
+attach.Name = "Attach"
+attach.CFrame = selHandle.CFrame:Inverse() * target.WorldCFrame
+attach.Parent = templateHandle
 
+print("✅ Saved clean template for: " .. template.Name)
+
+-- Live preview test
+local OutfitService = require(ServerScriptService.Services.KoalaOutfitService)
+if not koala:GetAttribute("Stage") then koala:SetAttribute("Stage", 4) end
+OutfitService.EquipOutfit(koala, template.Name)
+print("✨ Live preview equipped!")

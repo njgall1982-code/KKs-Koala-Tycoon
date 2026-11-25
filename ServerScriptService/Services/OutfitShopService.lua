@@ -27,31 +27,57 @@ local transactionRequest = signals:WaitForChild("TransactionRequest")
 local OutfitShopConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("OutfitShopConfig"))
 local KoalaOutfitService = require(game:GetService("ServerScriptService"):WaitForChild("Services"):WaitForChild("KoalaOutfitService"))
 
-local function setupVendorPrompt()
-	local shop = workspace:FindFirstChild("Shop")
-	local vendor = shop and shop:FindFirstChild("Koala Vendor")
-	local hrp = vendor and vendor:FindFirstChild("HumanoidRootPart")
-	if hrp then
-		local prompt = hrp:FindFirstChild("OutfitShopPrompt")
-		if not prompt then
-			prompt = Instance.new("ProximityPrompt")
-			prompt.Name = "OutfitShopPrompt"
-			prompt.ActionText = "Browse Outfits"
-			prompt.ObjectText = "Outfit Shop"
-			prompt.HoldDuration = 0
-			prompt.RequiresLineOfSight = false
-			prompt.MaxActivationDistance = 10
-			prompt.Parent = hrp
+local connections = {}
+
+local function connectPrompt(prompt)
+	if not prompt:IsA("ProximityPrompt") then return end
+	if prompt.Name ~= "OutfitShopPrompt" and not prompt.ObjectText:lower():find("outfit") then return end
+	if connections[prompt] then return end
+
+	print("[OutfitShopService] Connected to Outfit Shop prompt at: " .. prompt:GetFullName())
+	connections[prompt] = prompt.Triggered:Connect(function(player)
+		openOutfitShopEvent:FireClient(player)
+	end)
+
+	prompt.Destroying:Connect(function()
+		if connections[prompt] then
+			connections[prompt]:Disconnect()
+			connections[prompt] = nil
 		end
-		
-		-- Clear existing connections if any
-		prompt.Triggered:Connect(function(player)
-			openOutfitShopEvent:FireClient(player)
-		end)
-		print("[OutfitShopService] Configured Outfit Shop ProximityPrompt on Koala Vendor.")
-	else
-		warn("[OutfitShopService] Koala Vendor HumanoidRootPart not found. Cannot set up ProximityPrompt.")
+	end)
+end
+
+local function isVendorModel(model)
+	if not model:IsA("Model") then return false end
+	local name = model.Name:lower()
+	return name:find("outfit") or name:find("outift") or name == "koala vendor"
+end
+
+local function attachPromptToVendor(vendor)
+	local humanoid = vendor:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.DisplayName = "Outfit Shop"
+		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Viewer
+		humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
 	end
+
+	local targetPart = vendor:FindFirstChild("HumanoidRootPart") or vendor:FindFirstChild("Torso") or vendor.PrimaryPart or vendor:FindFirstChildWhichIsA("BasePart") or vendor
+	if not targetPart then return end
+
+	local prompt = targetPart:FindFirstChild("OutfitShopPrompt") or vendor:FindFirstChild("OutfitShopPrompt")
+	if not prompt then
+		prompt = Instance.new("ProximityPrompt")
+		prompt.Name = "OutfitShopPrompt"
+		prompt.ActionText = "Browse Outfits"
+		prompt.ObjectText = "Outfit Shop"
+		prompt.HoldDuration = 0
+		prompt.RequiresLineOfSight = false
+		prompt.MaxActivationDistance = 10
+		prompt.Parent = targetPart
+		print("[OutfitShopService] Created OutfitShopPrompt on " .. targetPart:GetFullName())
+	end
+
+	connectPrompt(prompt)
 end
 
 function OutfitShopService.Initialize()
@@ -81,25 +107,25 @@ function OutfitShopService.Initialize()
 		end
 	end)
 
-	-- Setup Physical Prompt
-	task.spawn(function()
-		local shop = workspace:WaitForChild("Shop", 10)
-		local vendor = shop and shop:WaitForChild("Koala Vendor", 10)
-		if vendor then
-			setupVendorPrompt()
-		else
-			-- Fallback: listen for descendent
-			local conn
-			conn = workspace.DescendantAdded:Connect(function(desc)
-				if desc.Name == "Koala Vendor" and desc:IsA("Model") then
-					setupVendorPrompt()
-					conn:Disconnect()
-				end
-			end)
+	-- Scan existing descendants for prompts and vendor models
+	for _, desc in ipairs(workspace:GetDescendants()) do
+		if desc:IsA("ProximityPrompt") then
+			connectPrompt(desc)
+		elseif isVendorModel(desc) then
+			attachPromptToVendor(desc)
+		end
+	end
+
+	-- Listen for dynamically added models or prompts
+	workspace.DescendantAdded:Connect(function(desc)
+		if desc:IsA("ProximityPrompt") then
+			connectPrompt(desc)
+		elseif isVendorModel(desc) then
+			attachPromptToVendor(desc)
 		end
 	end)
 
-	print("[OutfitShopService] Initialized.")
+	print("[OutfitShopService] Initialized (Dynamic Vendor Detection Mode).")
 end
 
 return OutfitShopService

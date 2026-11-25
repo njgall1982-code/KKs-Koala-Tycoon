@@ -3,6 +3,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local ServerStorage = game:GetService("ServerStorage")
 local RunService = game:GetService("RunService")
+local PhysicsService = game:GetService("PhysicsService")
+
+-- Collision Groups Setup (Players can walk through ExhibitGates, but Koalas are blocked)
+pcall(function() PhysicsService:RegisterCollisionGroup("Players") end)
+pcall(function() PhysicsService:RegisterCollisionGroup("Koalas") end)
+pcall(function() PhysicsService:RegisterCollisionGroup("ExhibitGates") end)
+PhysicsService:CollisionGroupSetCollidable("Players", "ExhibitGates", false)
+PhysicsService:CollisionGroupSetCollidable("Koalas", "ExhibitGates", true)
 
 -- Pre-create TeleportNotification RemoteEvent to prevent client scripts from yielding
 local teleportNotification = ReplicatedStorage:FindFirstChild("TeleportNotification")
@@ -47,6 +55,7 @@ local DevService = safeRequire(ServerScriptService.Services.DevService)
 local FeederVisualService = safeRequire(ServerScriptService.Services.FeederVisualService)
 local KoalaOutfitService = safeRequire(ServerScriptService.Services.KoalaOutfitService)
 local OutfitShopService = safeRequire(ServerScriptService.Services.OutfitShopService)
+local ZooTerminalService = safeRequire(ServerScriptService.Services.ZooTerminalService)
 
 -- New Refactored Services
 local KoalaSystem = safeRequire(ServerScriptService.Services.KoalaSystem)
@@ -124,6 +133,7 @@ safeInit(DevService, "DevService")
 safeInit(FeederVisualService, "FeederVisualService")
 safeInit(KoalaOutfitService, "KoalaOutfitService")
 safeInit(OutfitShopService, "OutfitShopService")
+safeInit(ZooTerminalService, "ZooTerminalService")
 
 -- New Services
 safeInit(KoalaSystem, "KoalaSystem")
@@ -141,6 +151,18 @@ local function onPlayerAdded(player)
 	end
 
 	local function setupCharacter(character)
+		-- Set Player CollisionGroup so players pass through exhibit gates
+		for _, part in ipairs(character:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.CollisionGroup = "Players"
+			end
+		end
+		character.DescendantAdded:Connect(function(part)
+			if part:IsA("BasePart") then
+				part.CollisionGroup = "Players"
+			end
+		end)
+
 		-- Give Starter Hammer
 		local hammerTemplate = ServerStorage:FindFirstChild("WoodenHammer")
 		if hammerTemplate then

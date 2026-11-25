@@ -20,6 +20,14 @@ local CLIMB_HEIGHT = 5
 local CLIMB_VERTICAL_SPEED = 4
 local KOALA_TAG = "KoalaNPC"
 
+-- Follow Mode Configuration
+local FOLLOW_STOP_DIST = 7            -- Close enough to player to stop and idle
+local FOLLOW_TELEPORT_DIST = 75       -- Distance before teleport timer begins (increased from 25 to give breathing room)
+local FOLLOW_TELEPORT_DELAY = 4.0     -- Must remain far away for 4s before teleporting (prevents instant snap)
+local FOLLOW_TELEPORT_MAX_DIST = 150 -- Extreme distance (respawn/warp) catch-up threshold
+local FOLLOW_TELEPORT_COOLDOWN = 5.0 -- Minimum cooldown between teleports to prevent spam
+local FOLLOW_STUCK_TIME = 3.5        -- Time stuck against an obstacle before unstuck teleport
+
 -- State storage
 local koalaStates = {}
 local signals = nil
@@ -440,37 +448,83 @@ local function updateWander(state, dt)
 			local destPos = targetHrp.Position
 			local flatDist = (Vector3.new(destPos.X, 0, destPos.Z) - Vector3.new(myPos.X, 0, myPos.Z)).Magnitude
 
-			-- Catch-up / Fence bypass: If player gets > 25 studs away OR koala gets stuck on a fence for > 2s
-			local distMoved = (myPos - (state.lastFollowPos or myPos)).Magnitude
-			if flatDist > 6 and distMoved < 0.2 then
-				state.followStuckTimer = (state.followStuckTimer or 0) + dt
-			else
-				state.followStuckTimer = 0
-			end
-			state.lastFollowPos = myPos
+			-- Cooldown decrement
+			state.followTeleportCooldown = math.max(0, (state.followTeleportCooldown or 0) - dt)
 
-			if flatDist > 25 or (state.followStuckTimer and state.followStuckTimer > 2.0) then
+			-- Accurate Stuck Detection: Sample movement over 0.5s windows instead of per-frame
+			state.followStuckSampleTimer = (state.followStuckSampleTimer or 0) + dt
+			if state.followStuckSampleTimer >= 0.5 then
+				local distMoved = (myPos - (state.lastFollowCheckPos or myPos)).Magnitude
+				state.followStuckSampleTimer = 0
+				state.lastFollowCheckPos = myPos
+
+				-- If trying to move towards player (> FOLLOW_STOP_DIST) but moved less than 0.8 studs in 0.5s (<1.6 studs/sec)
+				if flatDist > FOLLOW_STOP_DIST and distMoved < 0.8 then
+					state.followStuckTimer = (state.followStuckTimer or 0) + 0.5
+				else
+					state.followStuckTimer = 0
+				end
+			end
+
+			-- Teleport Distance Timer: Must stay far away for a sustained duration before triggering
+			if flatDist > FOLLOW_TELEPORT_DIST then
+				state.followFarTimer = (state.followFarTimer or 0) + dt
+			else
+				state.followFarTimer = 0
+			end
+
+			local shouldTeleport = false
+			if (state.followTeleportCooldown or 0) <= 0 then
+				if (state.followFarTimer or 0) >= FOLLOW_TELEPORT_DELAY then
+					-- Beyond FOLLOW_TELEPORT_DIST (75 studs) continuously for FOLLOW_TELEPORT_DELAY (4s)
+					shouldTeleport = true
+				elseif flatDist > FOLLOW_TELEPORT_MAX_DIST and (state.followFarTimer or 0) >= 1.0 then
+					-- Player died / fast-traveled far across tycoon
+					shouldTeleport = true
+				elseif (state.followStuckTimer or 0) >= FOLLOW_STUCK_TIME then
+					-- Genuinely stuck against a fence/obstacle for > 3.5s
+					shouldTeleport = true
+				end
+			end
+
+			if shouldTeleport then
+				state.followFarTimer = 0
 				state.followStuckTimer = 0
-				local offset = -targetHrp.CFrame.LookVector * 3.5 + targetHrp.CFrame.RightVector * 2
+				state.followTeleportCooldown = FOLLOW_TELEPORT_COOLDOWN
+
+				local offset = -targetHrp.CFrame.LookVector * 4 + targetHrp.CFrame.RightVector * 2
 				local rayOrigin = targetHrp.Position + offset + Vector3.new(0, 5, 0)
 				local rayParams = RaycastParams.new()
 				rayParams.FilterDescendantsInstances = {state.koala, targetChar}
 				rayParams.FilterType = Enum.RaycastFilterType.Exclude
 
 				local rayResult = workspace:Raycast(rayOrigin, Vector3.new(0, -20, 0), rayParams)
-				local targetSpawnPos = rayResult and rayResult.Position or (targetHrp.Position + offset)
+				local targetSpawnPos = rayResult and (rayResult.Position + Vector3.new(0, 1.2, 0)) or (targetHrp.Position + offset)
 
 				state.koala:PivotTo(CFrame.new(targetSpawnPos, targetSpawnPos + targetHrp.CFrame.LookVector))
 				state.hrp.AssemblyLinearVelocity = Vector3.zero
 				state.humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-				state.humanoid.WalkSpeed = WALK_SPEED
-				state.state = "idle"
+				state.lastFollowCheckPos = targetSpawnPos
+				state.humanoid.WalkSpeed = 14
+				state.state = "wandering"
+				state.targetPoint = destPos
+				state.humanoid:MoveTo(destPos)
 				return
 			end
 
-			if flatDist > 6 then
-				-- Walk towards player slightly faster than base waddle so it can keep up
-				state.humanoid.WalkSpeed = 10
+			if flatDist > FOLLOW_STOP_DIST then
+				-- Dynamic follow speed curve so koala can actually keep up with a walking player (default speed 16):
+				-- > 25 studs: speed 18 to close the gap
+				-- > 14 studs: speed 14 to maintain follow pace
+				-- <= 14 studs: speed 10 to smoothly settle near player
+				if flatDist > 25 then
+					state.humanoid.WalkSpeed = 18
+				elseif flatDist > 14 then
+					state.humanoid.WalkSpeed = 14
+				else
+					state.humanoid.WalkSpeed = 10
+				end
+
 				state.state = "wandering"
 				state.targetPoint = destPos
 				state.humanoid:MoveTo(destPos)
@@ -486,6 +540,9 @@ local function updateWander(state, dt)
 			-- Target player left or died: clear following attribute
 			state.koala:SetAttribute("FollowingPlayer", nil)
 			state.humanoid.WalkSpeed = WALK_SPEED
+			state.followFarTimer = 0
+			state.followStuckTimer = 0
+			state.followTeleportCooldown = 0
 		end
 	end
 

@@ -10,11 +10,54 @@ function DataStore.SaveData(player)
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if not leaderstats then return end
 
+	-- Collect any unplaced rescued koalas currently in crates or pending attribute
+	local pendingRescued = {}
 	local rescuedAttr = player:GetAttribute("RescuedKoalas") or "[]"
-	local rescuedDecoded = {}
 	pcall(function()
-		rescuedDecoded = HttpService:JSONDecode(rescuedAttr)
+		local decoded = HttpService:JSONDecode(rescuedAttr)
+		if type(decoded) == "table" then
+			for _, item in ipairs(decoded) do
+				table.insert(pendingRescued, item)
+			end
+		end
 	end)
+
+	-- Also check player Backpack and Character for any unplaced TransferCrate tools
+	local crateKoalasFound = {}
+	local searchContainers = {player:FindFirstChild("Backpack"), player.Character}
+	for _, container in ipairs(searchContainers) do
+		if container then
+			for _, item in ipairs(container:GetChildren()) do
+				if item:IsA("Tool") and (item.Name == "TransferCrate" or item.Name == "CratedKoala") then
+					local savedData = nil
+					local dataAttr = item:GetAttribute("RescuedKoalaData")
+					if dataAttr then
+						pcall(function() savedData = HttpService:JSONDecode(dataAttr) end)
+					end
+					if not savedData then
+						local koalaModel = item:FindFirstChildOfClass("Model")
+						if koalaModel then
+							local stats = koalaModel:FindFirstChild("KoalaStats")
+							local rarity = stats and stats:FindFirstChild("Rarity") and stats.Rarity.Value or (koalaModel:GetAttribute("Rarity") or "Cute")
+							local age = stats and stats:FindFirstChild("Age") and stats.Age.Value or (koalaModel:GetAttribute("Age") or 0)
+							savedData = {
+								Name = koalaModel.Name or "Koala",
+								DisplayName = koalaModel:GetAttribute("DisplayName") or "Wild Koala",
+								Rarity = rarity,
+								Age = age
+							}
+						end
+					end
+					if savedData then
+						table.insert(crateKoalasFound, savedData)
+					end
+				end
+			end
+		end
+	end
+
+	-- Prefer the higher-fidelity list if crates exist
+	local finalRescued = #crateKoalasFound > 0 and crateKoalasFound or pendingRescued
 
 	local unlockedAttr = player:GetAttribute("UnlockedOutfits") or "[]"
 	local unlockedDecoded = {}
@@ -41,7 +84,7 @@ function DataStore.SaveData(player)
 		LeafCount = player:GetAttribute("LeafCount") or 0,
 		OwnedTools = {},
 		MilkBottles = player:GetAttribute("MilkBottles") or 0,
-		RescuedKoalas = rescuedDecoded,
+		RescuedKoalas = finalRescued,
 		MaxLeaves = player:GetAttribute("MaxLeaves") or 5,
 		UnlockedOutfits = unlockedDecoded,
 		ZooComputerUnlocked = player:GetAttribute("ZooComputerUnlocked") or false,
@@ -181,18 +224,38 @@ function DataStore.LoadData(player)
 			local transferCrateTemplate = ServerStorage:FindFirstChild("TransferCrate")
 			
 			if transferCrateTemplate then
-				task.spawn(function()
-					task.wait(3) -- Wait for tycoon to initialize and character to load
-					local backpack = player:WaitForChild("Backpack", 5)
+				local function spawnPendingCrates()
+					local backpack = player:FindFirstChild("Backpack")
 					if not backpack then return end
 					
+					-- Check how many crates currently exist in Backpack + Character
+					local currentCrates = 0
+					local searchContainers = {backpack, player.Character}
+					for _, c in ipairs(searchContainers) do
+						if c then
+							for _, item in ipairs(c:GetChildren()) do
+								if item:IsA("Tool") and (item.Name == "TransferCrate" or item.Name == "CratedKoala") then
+									currentCrates += 1
+								end
+							end
+						end
+					end
+
+					-- Read currently pending list from attribute
+					local attr = player:GetAttribute("RescuedKoalas") or "[]"
+					local currentRescued = {}
+					pcall(function() currentRescued = HttpService:JSONDecode(attr) end)
+					if #currentRescued == 0 then return end
+					if currentCrates >= #currentRescued then return end
+
 					local KoalaLifecycle = require(game:GetService("ServerScriptService").Modules.KoalaLifecycle)
 					local CarryService = require(game:GetService("ServerScriptService").Services.CarryService)
 					local CollectionService = game:GetService("CollectionService")
 					local folder = ServerStorage:FindFirstChild("Koalas to pick from") or ServerStorage
 					local template = folder:FindFirstChild("Koala Baby")
 
-					for _, kData in ipairs(rescued) do
+					for i = currentCrates + 1, #currentRescued do
+						local kData = currentRescued[i]
 						local crate = transferCrateTemplate:Clone()
 						crate.Parent = backpack
 						
@@ -200,6 +263,7 @@ function DataStore.LoadData(player)
 							local koala = template:Clone()
 							koala.Name = kData.Name or "Koala"
 							koala:SetAttribute("DisplayName", kData.DisplayName or "Wild Koala")
+							koala:SetAttribute("HasBeenNamed", true)
 							
 							-- Anchor initially to prevent physics glitches
 							koala:SetAttribute("AI_Disabled", true)
@@ -213,25 +277,35 @@ function DataStore.LoadData(player)
 							-- Initialize the stats (rarity, age=0)
 							KoalaLifecycle.InitKoala(koala, kData.Rarity or "Cute", kData.Age or 0)
 							
-							task.wait(0.1) -- Small stabilization delay
+							task.wait(0.05) -- Small stabilization delay
 							
-							-- Weld inside the crate
-							local handle = crate:FindFirstChild("Handle")
-							if handle then
-								local weldTarget = handle:FindFirstChild("KoalaPos") or handle
-								CarryService.PickUp(player, koala, weldTarget)
-							end
-							print("[DataStore] 📦 Loaded and welded " .. koala:GetAttribute("DisplayName") .. " (" .. (kData.Rarity or "Cute") .. ") into player's TransferCrate tool!")
+							CarryService.WeldKoalaToCrate(crate, koala, kData)
+							print("[DataStore] 📦 Loaded and welded " .. (kData.DisplayName or "Koala") .. " (" .. (kData.Rarity or "Cute") .. ") into player's TransferCrate tool!")
 						else
 							warn("[DataStore] ❌ Koala Baby template missing. Cannot weld inside TransferCrate.")
 						end
 					end
+				end
+
+				-- Initial fast spawn
+				task.spawn(function()
+					if not player.Character then
+						player.CharacterAdded:Wait()
+					end
+					task.wait(0.8) -- Reduced delay so crates appear quickly and smoothly
+					spawnPendingCrates()
+				end)
+
+				-- Re-sync if player resets / character respawns before placing crates
+				player.CharacterAdded:Connect(function(char)
+					task.wait(1.0)
+					spawnPendingCrates()
 				end)
 			else
 				warn("[DataStore] ❌ TransferCrate template not found in ServerStorage!")
 			end
-			-- Clear them out on the player instance so they don't save/spawn again
-			player:SetAttribute("RescuedKoalas", "[]")
+			-- NOTE: We do NOT wipe player:SetAttribute("RescuedKoalas", "[]") here!
+			-- CarryService.Drop removes each koala individually as it is placed into an exhibit.
 		end
 
 		if result.OwnedTools then
@@ -339,11 +413,13 @@ function DataStore.LoadData(player)
 end
 
 -- Safety net for Studio/Server Shutdown
-game:BindToClose(function()
-	for _, player in ipairs(Players:GetPlayers()) do
-		DataStore.SaveData(player)
-	end
-	task.wait(2) -- Give time for async calls
+pcall(function()
+	game:BindToClose(function()
+		for _, player in ipairs(Players:GetPlayers()) do
+			DataStore.SaveData(player)
+		end
+		task.wait(2) -- Give time for async calls
+	end)
 end)
 
 return DataStore

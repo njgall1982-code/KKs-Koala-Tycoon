@@ -104,11 +104,24 @@ local function consumeMilkBottleTool(player)
     return false
 end
 
+local MAX_RESCUE_CRATES = 3
+
 function RescueService.RescueJoey(player, joeyInstance)
     local bottlesCount = player:GetAttribute("MilkBottles") or 0
     if bottlesCount <= 0 then
         -- Notify player they have no bottles left
         rescueNotifyEvent:FireClient(player, false, "You don't have any Milk Bottles left! Buy some back at the Tycoon.")
+        return
+    end
+
+    -- Check max crates allowed (up to 3) before consuming bottle
+    local rescuedListJson = player:GetAttribute("RescuedKoalas") or "[]"
+    local rescuedList = {}
+    pcall(function()
+        rescuedList = HttpService:JSONDecode(rescuedListJson)
+    end)
+    if #rescuedList >= MAX_RESCUE_CRATES then
+        rescueNotifyEvent:FireClient(player, false, string.format("Your rescue transport is full (%d/%d crates)! Return to your Tycoon to place them first.", #rescuedList, MAX_RESCUE_CRATES))
         return
     end
 
@@ -131,17 +144,13 @@ function RescueService.RescueJoey(player, joeyInstance)
     local koalaName = KoalaConfig.GetRandomName()
 
     -- Add to RescuedKoalas pending queue
-    local rescuedListJson = player:GetAttribute("RescuedKoalas") or "[]"
-    local rescuedList = {}
-    pcall(function()
-        rescuedList = HttpService:JSONDecode(rescuedListJson)
-    end)
-    table.insert(rescuedList, {
+    local kData = {
         Name = "Koala",
         DisplayName = koalaName,
         Rarity = rarityName,
         Age = 0
-    })
+    }
+    table.insert(rescuedList, kData)
     player:SetAttribute("RescuedKoalas", HttpService:JSONEncode(rescuedList))
     
     local ownedCount = player:GetAttribute("OwnedKoalasCount") or 0
@@ -182,6 +191,8 @@ function RescueService.RescueJoey(player, joeyInstance)
             local backpack = player:FindFirstChild("Backpack")
             if backpack then
                 local crate = transferCrateTemplate:Clone()
+                crate:SetAttribute("RescuedKoalaData", HttpService:JSONEncode(kData))
+                crate.ToolTip = string.format("Contains: %s (%s)", koalaName, rarityName)
                 crate.Parent = backpack
                 
                 if koalaTemplate then
@@ -190,6 +201,7 @@ function RescueService.RescueJoey(player, joeyInstance)
                     koala:SetAttribute("DisplayName", koalaName)
                     koala:SetAttribute("Rarity", rarityName)
                     koala:SetAttribute("Age", 0)
+                    koala:SetAttribute("HasBeenNamed", true)
                     
                     -- Anchor initially to prevent physics glitches
                     koala:SetAttribute("AI_Disabled", true)
@@ -258,7 +270,7 @@ function RescueService.RescueJoey(player, joeyInstance)
 
     -- Notify client of success with rarity information
     print(string.format("[RescueService] Player %s rescued %s (%s)!", player.Name, koalaName, rarityName))
-    rescueNotifyEvent:FireClient(player, true, string.format("You rescued %s! They are a %s Koala! 🐨\nCheck your Tycoon, they have been sent back in a transport crate!", koalaName, rarityName), rarityName)
+    rescueNotifyEvent:FireClient(player, true, string.format("You rescued %s! They are a %s Koala! 🐨 (%d/%d crates)\nReturn to your Tycoon to place them in an exhibit!", koalaName, rarityName, #rescuedList, MAX_RESCUE_CRATES), rarityName)
 end
 
 return RescueService

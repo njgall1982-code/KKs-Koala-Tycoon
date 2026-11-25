@@ -28,18 +28,31 @@ end
 tool.Activated:Connect(function()
 	if tick() - lastAction < COOLDOWN then return end
 	
-	local isCarrying = player:GetAttribute("Carrying") ~= nil
-	if not isCarrying then return end
+	-- Verify tool is currently held in character
+	if not player.Character or tool.Parent ~= player.Character then return end
 	
-	-- Use the player's position or the mouse hit position to find the exhibit
-	-- Checking mouse hit first, then falling back to player position
-	local exhibit = getExhibitAtPosition(mouse.Hit.Position) or getExhibitAtPosition(player.Character.PrimaryPart.Position)
+	local rootPart = player.Character.PrimaryPart or player.Character:FindFirstChild("HumanoidRootPart")
+	local playerPos = rootPart and rootPart.Position
+	local hitPos = mouse and mouse.Hit and mouse.Hit.Position
+
+	-- Use mouse hit position first, then fall back to player position
+	local exhibit = (hitPos and getExhibitAtPosition(hitPos)) or (playerPos and getExhibitAtPosition(playerPos))
 	
 	if exhibit then
 		lastAction = tick()
-		remote:FireServer("Drop", {pos = mouse.Hit.Position, exhibitName = exhibit.Name})
+		local targetPos = (hitPos and getExhibitAtPosition(hitPos) and hitPos) or playerPos
+		remote:FireServer("Drop", {pos = targetPos, exhibitName = exhibit.Name})
 	else
-		-- Provide some client-side feedback
-		print("Must be inside or clicking an Exhibit to release the koala!")
+		-- Provide helpful on-screen feedback
+		local playerGui = player:FindFirstChild("PlayerGui")
+		local tutorialUI = playerGui and playerGui:FindFirstChild("TutorialUI")
+		local statusLabel = tutorialUI and tutorialUI:FindFirstChild("Status")
+		if statusLabel then
+			statusLabel.Text = "⚠️ Stand inside or click an Exhibit to release the koala!"
+			statusLabel.Visible = true
+			task.delay(4, function() statusLabel.Visible = false end)
+		else
+			print("Must be inside or clicking an Exhibit to release the koala!")
+		end
 	end
 end)

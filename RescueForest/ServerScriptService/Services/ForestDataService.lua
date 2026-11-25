@@ -162,4 +162,97 @@ function ForestDataService.SyncMilkBottlesToBackpack(player)
     end
 end
 
+function ForestDataService.SyncRescuedKoalasToBackpack(player)
+    local backpack = player:FindFirstChild("Backpack")
+    if not backpack then return end
+
+    local rescuedAttr = player:GetAttribute("RescuedKoalas") or "[]"
+    local rescuedList = {}
+    pcall(function()
+        rescuedList = HttpService:JSONDecode(rescuedAttr)
+    end)
+    if #rescuedList == 0 then return end
+
+    -- Count existing crates in backpack and character
+    local currentCrates = 0
+    local searchContainers = {backpack, player.Character}
+    for _, c in ipairs(searchContainers) do
+        if c then
+            for _, item in ipairs(c:GetChildren()) do
+                if item:IsA("Tool") and (item.Name == "TransferCrate" or item.Name == "CratedKoala") then
+                    currentCrates = currentCrates + 1
+                end
+            end
+        end
+    end
+
+    if currentCrates >= #rescuedList then return end
+
+    local ServerStorage = game:GetService("ServerStorage")
+    local transferCrateTemplate = ServerStorage:FindFirstChild("CratedKoala")
+        or (ServerStorage:FindFirstChild("Prototypes") and ServerStorage.Prototypes:FindFirstChild("CratedKoala"))
+        or ServerStorage:FindFirstChild("TransferCrate")
+        
+    local koalaTemplate = ServerStorage:FindFirstChild("Koala Baby")
+        or (ServerStorage:FindFirstChild("Prototypes") and ServerStorage.Prototypes:FindFirstChild("Koala Baby"))
+        or ServerStorage:FindFirstChild("WildJoey")
+        or (ServerStorage:FindFirstChild("Prototypes") and ServerStorage.Prototypes:FindFirstChild("WildJoey"))
+        or (ServerStorage:FindFirstChild("Koalas to pick from") and ServerStorage["Koalas to pick from"]:FindFirstChild("Koala Baby"))
+
+    if not transferCrateTemplate then return end
+
+    for i = currentCrates + 1, #rescuedList do
+        local kData = rescuedList[i]
+        local crate = transferCrateTemplate:Clone()
+        crate:SetAttribute("RescuedKoalaData", HttpService:JSONEncode(kData))
+        crate.ToolTip = string.format("Contains: %s (%s)", kData.DisplayName or "Wild Koala", kData.Rarity or "Cute")
+        crate.Parent = backpack
+
+        if koalaTemplate then
+            local koala = koalaTemplate:Clone()
+            koala.Name = "Koala"
+            koala:SetAttribute("DisplayName", kData.DisplayName or "Wild Koala")
+            koala:SetAttribute("Rarity", kData.Rarity or "Cute")
+            koala:SetAttribute("Age", kData.Age or 0)
+            koala:SetAttribute("HasBeenNamed", true)
+
+            for _, p in pairs(koala:GetDescendants()) do
+                if p:IsA("BasePart") then p.Anchored = true end
+            end
+            koala.Parent = workspace
+            task.wait(0.05)
+
+            local handle = crate:FindFirstChild("Handle")
+            if handle then
+                local targetRoot = koala:FindFirstChild("HumanoidRootPart") or koala:FindFirstChildOfClass("Part")
+                local weldTarget = handle:FindFirstChild("KoalaPos") or handle
+                if targetRoot and weldTarget then
+                    if weldTarget:IsA("Attachment") then
+                        koala:PivotTo(weldTarget.WorldCFrame)
+                    else
+                        koala:PivotTo(weldTarget.CFrame)
+                    end
+                    for _, p in pairs(koala:GetDescendants()) do
+                        if p:IsA("BasePart") then
+                            p.CanCollide = false
+                            p.Massless = true
+                            p.Anchored = false
+                        end
+                    end
+                    local weld = Instance.new("WeldConstraint")
+                    weld.Name = "CarryWeld"
+                    local part0 = weldTarget:IsA("Attachment") and weldTarget.Parent or weldTarget
+                    weld.Part0 = part0
+                    weld.Part1 = targetRoot
+                    weld.Parent = targetRoot
+                    koala.Parent = crate
+                    local hum = koala:FindFirstChildOfClass("Humanoid")
+                    if hum then hum.PlatformStand = true end
+                    koala:SetAttribute("IsBeingCarried", true)
+                end
+            end
+        end
+    end
+end
+
 return ForestDataService

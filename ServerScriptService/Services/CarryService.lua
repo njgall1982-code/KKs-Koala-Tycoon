@@ -154,145 +154,237 @@ function CarryService.PerformCuddle(player, koala)
 	hum.JumpPower = oldJump
 end
 
-function CarryService.Drop(player, dropCFrame, explicitExhibitName)
-	print("[CarryService] 🟢 STARTING DROP for " .. player.Name)
-	local currentlyCarrying = player:GetAttribute("Carrying") or "NOTHING"
-	print('[CarryService] Attribute "Carrying" is: ' .. currentlyCarrying)
+function CarryService.SetArms(player, hold)
+	setArms(player, hold)
+end
 
+function CarryService.WeldKoalaToCrate(crate, koala, kData)
+	koala:SetAttribute("AI_Disabled", true)
+	koala:SetAttribute("IsBeingCarried", true)
+	koala:SetAttribute("Crated", true)
+	koala:SetAttribute("FollowingPlayer", nil)
+
+	local targetRoot = koala:FindFirstChild("HumanoidRootPart") or koala:FindFirstChildOfClass("Part")
+	local handle = crate:FindFirstChild("Handle")
+	if not handle or not targetRoot then return end
+
+	local weldTarget = handle:FindFirstChild("KoalaPos") or handle
+	if weldTarget:IsA("Attachment") then
+		koala:PivotTo(weldTarget.WorldCFrame)
+	else
+		koala:PivotTo(weldTarget.CFrame)
+	end
+
+	for _, p in pairs(koala:GetDescendants()) do
+		if p:IsA("BasePart") then
+			p.CanCollide = false
+			p.Massless = true
+			p.Anchored = false
+			p.Transparency = 0
+			if p.Name == "HumanoidRootPart" then p.Transparency = 1 end
+		end
+	end
+
+	local weld = Instance.new("WeldConstraint")
+	weld.Name = "CarryWeld"
+	local part0 = (weldTarget:IsA("Attachment") and weldTarget.Parent) or weldTarget
+	weld.Part0 = part0
+	weld.Part1 = targetRoot
+	weld.Parent = targetRoot
+
+	koala.Parent = crate
+
+	local targetHum = koala:FindFirstChild("Humanoid")
+	if targetHum then
+		targetHum.PlatformStand = true
+	end
+
+	if kData then
+		local HttpService = game:GetService("HttpService")
+		crate:SetAttribute("RescuedKoalaData", HttpService:JSONEncode(kData))
+		crate.ToolTip = string.format("Contains: %s (%s)", kData.DisplayName or "Wild Koala", kData.Rarity or "Cute")
+	end
+end
+
+function CarryService.Drop(player, dropCFrame, explicitExhibitName, specificModel, sourceTool)
+	print("[CarryService] 🟢 STARTING DROP for " .. player.Name)
 	local character = player.Character
 	if not character then return false end
 
+	local targetModel = specificModel
 	local carryingName = player:GetAttribute("Carrying")
-	if not carryingName then return false end
 
-	-- Find the carried model
-	local searchContainers = {character, player.Backpack, workspace}
-	local targetModel = nil
-
-	for _, container in ipairs(searchContainers) do
-		for _, m in pairs(container:GetDescendants()) do
-			if m:IsA("Model") and m.Name == carryingName and m:GetAttribute("IsBeingCarried") then
-				targetModel = m
-				print("[CarryService] 🟢 FOUND " .. m.Name .. " inside " .. container.Name)
-				break
+	-- If specificModel not passed, search based on carryingName
+	if not targetModel then
+		if not carryingName then return false end
+		local searchContainers = {character, player.Backpack, workspace}
+		for _, container in ipairs(searchContainers) do
+			for _, m in pairs(container:GetDescendants()) do
+				if m:IsA("Model") and m.Name == carryingName and m:GetAttribute("IsBeingCarried") then
+					targetModel = m
+					print("[CarryService] 🟢 FOUND " .. m.Name .. " inside " .. container.Name)
+					break
+				end
 			end
+			if targetModel then break end
 		end
-		if targetModel then break end
 	end
 
-	if targetModel then
-		local exhibitName = explicitExhibitName
-		local dropParent = nil
+	if not targetModel then return false end
 
-		-- 1. Identify Exhibit (Optimized)
-		if not exhibitName then
-			for _, folder in ipairs(workspace:GetChildren()) do
-				if folder:IsA("Folder") and folder.Name:find("_Workspace") then
-					local ground = folder:FindFirstChild("Ground")
-					if ground and (ground.Position - dropCFrame.Position).Magnitude < 35 then
-						exhibitName = folder.Name
-						dropParent = folder
+	local exhibitName = explicitExhibitName
+	local dropParent = nil
+
+	-- 1. Identify Exhibit (Optimized)
+	if not exhibitName then
+		for _, folder in ipairs(workspace:GetChildren()) do
+			if folder:IsA("Folder") and folder.Name:find("_Workspace") then
+				local ground = folder:FindFirstChild("Ground")
+				if ground and (ground.Position - dropCFrame.Position).Magnitude < 35 then
+					exhibitName = folder.Name
+					dropParent = folder
+					break
+				end
+			end
+		end
+	else
+		dropParent = workspace:FindFirstChild(exhibitName)
+	end
+
+	-- 2. Validate Exhibit State
+	if exhibitName and dropParent then
+		if not dropParent:GetAttribute("IsRepaired") then
+			local playerGui = player:FindFirstChild("PlayerGui")
+			local tutorialUI = playerGui and playerGui:FindFirstChild("TutorialUI")
+			local statusLabel = tutorialUI and tutorialUI:FindFirstChild("Status")
+			if statusLabel then
+				statusLabel.Text = "⚠️ You must repair the exhibit before placing koalas!"
+				statusLabel.Visible = true
+				task.delay(5, function() statusLabel.Visible = false end)
+			end
+			return false
+		end
+
+		-- Capacity Check (exclude the koala currently being dropped)
+		local maxKoalas = dropParent:GetAttribute("MaxKoalas") or 10
+		local currentKoalas = 0
+		local CollectionService = game:GetService("CollectionService")
+		for _, child in ipairs(dropParent:GetChildren()) do
+			if child ~= targetModel and child:IsA("Model") and CollectionService:HasTag(child, "KoalaNPC") then
+				currentKoalas += 1
+			end
+		end
+
+		if currentKoalas >= maxKoalas then
+			local playerGui = player:FindFirstChild("PlayerGui")
+			local tutorialUI = playerGui and playerGui:FindFirstChild("TutorialUI")
+			local statusLabel = tutorialUI and tutorialUI:FindFirstChild("Status")
+			if statusLabel then
+				statusLabel.Text = "⚠️ Exhibit Full!"
+				statusLabel.Visible = true
+				task.delay(5, function() statusLabel.Visible = false end)
+			end
+			return false
+		end
+	end
+
+	-- Identify crate tool if any
+	local crateTool = sourceTool
+	if not crateTool then
+		crateTool = targetModel:FindFirstAncestorOfClass("Tool")
+			or (targetModel.Parent and targetModel.Parent:IsA("Tool") and targetModel.Parent)
+	end
+	local isCrate = crateTool and (crateTool.Name == "TransferCrate" or crateTool.Name == "CratedKoala")
+
+	-- Clean Arms
+	pcall(function() setArms(player, false) end)
+	player:SetAttribute("Carrying", nil)
+
+	-- Respawn
+	local spawnPos = dropCFrame.Position
+	if dropParent and dropParent:FindFirstChild("Ground") then
+		local g = dropParent.Ground
+		local rayOrigin = Vector3.new(spawnPos.X, spawnPos.Y + 50, spawnPos.Z)
+		local rayDirection = Vector3.new(0, -100, 0)
+		local rayParams = RaycastParams.new()
+		rayParams.FilterDescendantsInstances = {player.Character, targetModel}
+		rayParams.FilterType = Enum.RaycastFilterType.Exclude
+		local result = workspace:Raycast(rayOrigin, rayDirection, rayParams)
+		if result then spawnPos = result.Position end
+	end
+
+	-- Trigger crate open VFX/sound if dropping from a crate
+	if isCrate then
+		local KoalaVFX = require(game:GetService("ServerScriptService").Modules.KoalaVFX)
+		KoalaVFX.ShowCrateOpenEffect(spawnPos)
+	end
+
+	-- Unweld and reparent to workspace before firing respawn
+	for _, desc in ipairs(targetModel:GetDescendants()) do
+		if desc:IsA("WeldConstraint") and desc.Name == "CarryWeld" then
+			desc:Destroy()
+		end
+	end
+	targetModel.Parent = workspace
+
+	-- Save display name to remove from pending RescuedKoalas queue
+	local koalaDisplayName = targetModel:GetAttribute("DisplayName")
+
+	local signals = game:GetService("ServerStorage"):FindFirstChild("Signals")
+	local respawnRequest = signals and signals:FindFirstChild("RespawnRequest")
+	if respawnRequest then
+		respawnRequest:Fire(targetModel, spawnPos, dropParent)
+	end
+
+	-- Automatically destroy empty crate tool
+	if isCrate and crateTool then
+		crateTool:Destroy()
+	end
+
+	-- Update player's RescuedKoalas attribute (remove placed koala from pending list)
+	if isCrate then
+		local HttpService = game:GetService("HttpService")
+		local rescuedAttr = player:GetAttribute("RescuedKoalas") or "[]"
+		local rescuedList = {}
+		pcall(function()
+			rescuedList = HttpService:JSONDecode(rescuedAttr)
+		end)
+		if #rescuedList > 0 then
+			local removed = false
+			if koalaDisplayName then
+				for i, item in ipairs(rescuedList) do
+					if item.DisplayName == koalaDisplayName then
+						table.remove(rescuedList, i)
+						removed = true
 						break
 					end
 				end
 			end
-		else
-			dropParent = workspace:FindFirstChild(exhibitName)
-		end
-
-		-- 2. Validate Exhibit State
-		if exhibitName and dropParent then
-			if not dropParent:GetAttribute("IsRepaired") then
-				local playerGui = player:FindFirstChild("PlayerGui")
-				local tutorialUI = playerGui and playerGui:FindFirstChild("TutorialUI")
-				local statusLabel = tutorialUI and tutorialUI:FindFirstChild("Status")
-				if statusLabel then
-					statusLabel.Text = "⚠️ You must repair the exhibit before placing koalas!"
-					statusLabel.Visible = true
-					task.delay(5, function() statusLabel.Visible = false end)
-				end
-				return false
+			if not removed then
+				-- Fallback: remove first item
+				table.remove(rescuedList, 1)
 			end
-
-			-- Capacity Check (exclude the koala currently being dropped)
-			local maxKoalas = dropParent:GetAttribute("MaxKoalas") or 10
-			local currentKoalas = 0
-			local CollectionService = game:GetService("CollectionService")
-			for _, child in ipairs(dropParent:GetChildren()) do
-				if child ~= targetModel and child:IsA("Model") and CollectionService:HasTag(child, "KoalaNPC") then
-					currentKoalas += 1
-				end
-			end
-
-			if currentKoalas >= maxKoalas then
-				local playerGui = player:FindFirstChild("PlayerGui")
-				local tutorialUI = playerGui and playerGui:FindFirstChild("TutorialUI")
-				local statusLabel = tutorialUI and tutorialUI:FindFirstChild("Status")
-				if statusLabel then
-					statusLabel.Text = "⚠️ Exhibit Full!"
-					statusLabel.Visible = true
-					task.delay(5, function() statusLabel.Visible = false end)
-				end
-				return false
-			end
+			player:SetAttribute("RescuedKoalas", HttpService:JSONEncode(rescuedList))
+			print(string.format("[CarryService] Removed %s from RescuedKoalas. Remaining pending: %d", koalaDisplayName or "unknown", #rescuedList))
 		end
-
-		-- Clean Arms
-		pcall(function() setArms(player, false) end)
-		player:SetAttribute("Carrying", nil)
-
-		-- Check if the koala is carried in a transfer crate
-		local crateTool = targetModel.Parent
-		local isCrate = crateTool and crateTool:IsA("Tool") and (crateTool.Name == "TransferCrate" or crateTool.Name == "CratedKoala")
-
-		-- Respawn
-		local spawnPos = dropCFrame.Position
-		if dropParent and dropParent:FindFirstChild("Ground") then
-			local g = dropParent.Ground
-			local rayOrigin = Vector3.new(spawnPos.X, spawnPos.Y + 50, spawnPos.Z)
-			local rayDirection = Vector3.new(0, -100, 0)
-			local rayParams = RaycastParams.new()
-			rayParams.FilterDescendantsInstances = {player.Character, targetModel}
-			rayParams.FilterType = Enum.RaycastFilterType.Exclude
-			local result = workspace:Raycast(rayOrigin, rayDirection, rayParams)
-			if result then spawnPos = result.Position end
-		end
-
-		-- Trigger crate open VFX/sound if dropping from a crate
-		if isCrate then
-			local KoalaVFX = require(game:GetService("ServerScriptService").Modules.KoalaVFX)
-			KoalaVFX.ShowCrateOpenEffect(spawnPos)
-		end
-
-		local signals = game:GetService("ServerStorage"):FindFirstChild("Signals")
-		local respawnRequest = signals and signals:FindFirstChild("RespawnRequest")
-		if respawnRequest then
-			respawnRequest:Fire(targetModel, spawnPos, dropParent)
-		end
-
-		-- Automatically destroy empty crate tool
-		if isCrate then
-			crateTool:Destroy()
-		end
-
-		-- Tutorial Reward Logic
-		if exhibitName == "TutorialExhibit_Workspace" and carryingName == "KK" then
-			local hasExhibit = player:FindFirstChild("HasExhibit")
-			if hasExhibit and not hasExhibit.Value then
-				local grantCurrency = signals and signals:FindFirstChild("GrantCurrency")
-				if grantCurrency then grantCurrency:Fire(player, 500, "Cash") end
-				hasExhibit.Value = true
-			end
-			local updateQuest = signals and signals:FindFirstChild("UpdateQuest")
-			if updateQuest then
-				updateQuest:Fire(player, "🎉 KK is Home!")
-				task.delay(5, function() updateQuest:Fire(player, "") end)
-			end
-		end
-
-		return true
 	end
-	return false
+
+	-- Tutorial Reward Logic
+	if exhibitName == "TutorialExhibit_Workspace" and (carryingName == "KK" or (targetModel and targetModel.Name == "KK")) then
+		local hasExhibit = player:FindFirstChild("HasExhibit")
+		if hasExhibit and not hasExhibit.Value then
+			local grantCurrency = signals and signals:FindFirstChild("GrantCurrency")
+			if grantCurrency then grantCurrency:Fire(player, 500, "Cash") end
+			hasExhibit.Value = true
+		end
+		local updateQuest = signals and signals:FindFirstChild("UpdateQuest")
+		if updateQuest then
+			updateQuest:Fire(player, "🎉 KK is Home!")
+			task.delay(5, function() updateQuest:Fire(player, "") end)
+		end
+	end
+
+	return true
 end
 
 return CarryService

@@ -97,6 +97,7 @@ local function onPlayerAdded(player)
             task.wait(1)
             if ForestDataService then
                 ForestDataService.SyncMilkBottlesToBackpack(player)
+                ForestDataService.SyncRescuedKoalasToBackpack(player)
             end
         end)
     end

@@ -4,14 +4,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
 function QuestService.Initialize()
-    local signals = ServerStorage:WaitForChild("Signals")
-    local updateQuestSignal = signals:WaitForChild("UpdateQuest")
+    local Net = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net"))
+    local updateQuestSignal = Net.Signal("UpdateQuest")
+    local remote = Net.Remote("QuestUpdate")
 
     updateQuestSignal.Event:Connect(function(player, message)
-        local remote = ReplicatedStorage:FindFirstChild("QuestUpdate")
-        if remote then 
-            remote:FireClient(player, message) 
-        end
+        remote:FireClient(player, message)
     end)
     
     print("[QuestService] Initialized. Listening to UpdateQuest signal.")

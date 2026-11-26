@@ -1,0 +1,87 @@
+{
+  "name": "KKsKoalaTycoon",
+  "tree": {
+    "$className": "DataModel",
+
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "$ignoreUnknownInstances": true,
+      "Main": { "$path": "ServerScriptService/Main.server.lua" },
+      "Services": { "$path": "ServerScriptService/Services", "$ignoreUnknownInstances": true },
+      "Modules": { "$path": "ServerScriptService/Modules", "$ignoreUnknownInstances": true }
+    },
+
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "$ignoreUnknownInstances": true,
+      "Modules": { "$path": "ReplicatedStorage/Modules", "$ignoreUnknownInstances": true },
+      "Config": { "$path": "ReplicatedStorage/Config", "$ignoreUnknownInstances": true }
+    },
+
+    "ServerStorage": {
+      "$className": "ServerStorage",
+      "$ignoreUnknownInstances": true,
+      "Garden Shovel": {
+        "$className": "Tool",
+        "$ignoreUnknownInstances": true,
+        "ShovelScript": { "$path": "ServerStorage/Shovel/ShovelScript.server.lua" }
+      },
+      "TransferCrate": {
+        "$className": "Tool",
+        "$ignoreUnknownInstances": true,
+        "CrateClient": { "$path": "ServerStorage/TransferCrate/CrateClient.client.lua" },
+        "CrateServer": { "$path": "ServerStorage/TransferCrate/CrateServer.server.lua" }
+      }
+    },
+
+    "StarterGui": {
+      "$className": "StarterGui",
+      "$ignoreUnknownInstances": true,
+      "ToolShopGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "ShopController": { "$path": "StarterGui Controllers/ShopController.client.lua" }
+      },
+      "QuestGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "QuestClient": { "$path": "StarterGui Controllers/QuestClient.client.lua" }
+      },
+      "TeleportGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "TeleportClient": { "$path": "StarterGui Controllers/TeleportClient.client.lua" }
+      },
+      "MoneyGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "MoneyClient": { "$path": "StarterGui Controllers/MoneyClient.client.lua" }
+      },
+      "ExhibitManagementGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "ManagementLogic": { "$path": "StarterGui Controllers/ManagementLogic.client.lua" }
+      }
+    },
+
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "$ignoreUnknownInstances": true,
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "$path": "StarterPlayer/StarterPlayerScripts",
+        "$ignoreUnknownInstances": true
+      }
+    },
+
+    "StarterPack": {
+      "$className": "StarterPack",
+      "$ignoreUnknownInstances": true,
+      "DevWand": {
+        "$className": "Tool",
+        "$ignoreUnknownInstances": true,
+        "DevWandLocal": { "$path": "StarterPack/DevWand/DevWandLocal.client.lua" }
+      }
+    }
+  }
+}

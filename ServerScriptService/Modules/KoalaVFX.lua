@@ -189,4 +189,57 @@ function KoalaVFX.ShowCrateOpenEffect(position)
 	end)
 end
 
+-- Magic sparkle puff when shoveling waste
+function KoalaVFX.ShowCleanSparkleEffect(position)
+	local part = Instance.new("Part")
+	part.Name = "CleanSparkleVFX"
+	part.Size = Vector3.new(1, 1, 1)
+	part.Position = position
+	part.Transparency = 1
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.Parent = workspace
+
+	local puffParticles = Instance.new("ParticleEmitter")
+	puffParticles.Name = "MagicPuff"
+	puffParticles.Color = ColorSequence.new(Color3.fromRGB(220, 255, 235))
+	puffParticles.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.35),
+		NumberSequenceKeypoint.new(0.5, 0.6),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	puffParticles.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.2),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	puffParticles.Lifetime = NumberRange.new(0.4, 0.7)
+	puffParticles.Rate = 0
+	puffParticles.Speed = NumberRange.new(2, 5)
+	puffParticles.SpreadAngle = Vector2.new(180, 180)
+	puffParticles.Parent = part
+
+	local sparkleParticles = Instance.new("ParticleEmitter")
+	sparkleParticles.Name = "CleanSparkles"
+	sparkleParticles.Color = ColorSequence.new(Color3.fromRGB(130, 255, 170))
+	sparkleParticles.LightEmission = 0.8
+	sparkleParticles.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.3),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	sparkleParticles.Lifetime = NumberRange.new(0.5, 0.9)
+	sparkleParticles.Rate = 0
+	sparkleParticles.Speed = NumberRange.new(3, 6)
+	sparkleParticles.SpreadAngle = Vector2.new(180, 180)
+	sparkleParticles.Parent = part
+
+	puffParticles:Emit(10)
+	sparkleParticles:Emit(12)
+
+	task.delay(1.2, function()
+		if part then part:Destroy() end
+	end)
+end
+
 return KoalaVFX

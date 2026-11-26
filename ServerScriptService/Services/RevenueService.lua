@@ -228,6 +228,8 @@ function RevenueService.GetAnalyticsPayload(player)
 		local foodScore = math.floor(foodRatio * 60)
 		local cuddleScore = (koalaCount > 0) and math.round((cuddledCount / koalaCount) * 25) or 0
 		local socialScore = (koalaCount >= 2) and 15 or ((koalaCount == 1) and 8 or 0)
+		local wasteCount = exhibit:GetAttribute("WasteCount") or 0
+		local cleanlinessPenalty = KoalaConfig.CalculateCleanlinessPenalty(wasteCount)
 
 		parkTotalRevenue += exhibitRevenue
 		parkTotalKoalas += koalaCount
@@ -242,6 +244,7 @@ function RevenueService.GetAnalyticsPayload(player)
 			koalaCount = koalaCount,
 			maxKoalas = maxKoalas,
 			isRepaired = isRepaired,
+			wasteCount = wasteCount,
 			revenue = exhibitRevenue,
 			averageHappiness = avgHappiness,
 			isTelemetryUnlocked = isTeleUnlocked,
@@ -255,6 +258,9 @@ function RevenueService.GetAnalyticsPayload(player)
 				koalaCount = koalaCount,
 				socialScore = socialScore,
 				socialMax = 15,
+				wasteCount = wasteCount,
+				wasteGrace = KoalaConfig.WASTE_GRACE_COUNT,
+				cleanlinessPenalty = cleanlinessPenalty,
 				totalHappiness = avgHappiness,
 			},
 			koalas = koalaCards

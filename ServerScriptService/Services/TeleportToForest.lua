@@ -7,7 +7,7 @@ local TeleportToForest = {}
 local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerScriptService = game:GetService("ServerScriptService")
+local Net = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net"))
 
 local FOREST_PLACE_ID = 79103142136739
 
@@ -54,21 +54,10 @@ function TeleportToForest.Initialize()
 			print("[TeleportToForest] Travel to Rescue Forest requested by: " .. player.Name)
 			
 			-- Trigger visual fade event on client
-			local event = ReplicatedStorage:FindFirstChild("TeleportNotification")
-			if not event then
-				event = Instance.new("RemoteEvent")
-				event.Name = "TeleportNotification"
-				event.Parent = ReplicatedStorage
-			end
-			event:FireClient(player)
+			Net.Remote("TeleportNotification"):FireClient(player)
 
 			-- Save progress immediately before teleporting
-			local DataStoreModule = require(ServerScriptService.Services.DataStoreModule)
-			if DataStoreModule then
-				DataStoreModule.SaveData(player)
-			else
-				warn("[TeleportToForest] DataStoreModule not found. Cannot force pre-teleport save!")
-			end
+			Net.Signal("SavePlayerData"):Invoke(player)
 
 			if RunService:IsStudio() then
 				print("[TeleportToForest] ⚠️ Teleportation is disabled in Studio.")

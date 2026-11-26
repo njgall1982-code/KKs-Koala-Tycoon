@@ -1,6 +1,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
-local remote = ReplicatedStorage:WaitForChild("QuestUpdate")
+local Net = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net"))
+local remote = Net.Remote("QuestUpdate")
 
 -- We find the sound, but we don't WAIT for it. If it's missing, the quest still works.
 local sound = ReplicatedStorage:FindFirstChild("QuestUpdateSound")

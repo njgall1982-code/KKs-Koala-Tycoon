@@ -1,5 +1,5 @@
 # 🐨 Koala Tycoon: Project Manifest
-**Last Updated: May 3, 2026**
+**Last Updated: Nov 25, 2026** (Rojo migration, Net registry, Log module; see ARCHITECTURE.md)
 
 ### 🏆 Current Milestone: Rescue Forest, Lifecycle & Outfits (Phases 1-3 - COMPLETED)
 We have completed:
@@ -9,9 +9,10 @@ We have completed:
 
 ### 🛠️ Core Technical Pillars (Lessons Learned)
 
-PRIMARY: The local folder is the absolute Source of Truth for all scripts/files.
+PRIMARY: The local folder is the absolute Source of Truth for all scripts/files. See `ARCHITECTURE.md` for structure, communication rules and ownership maps.
 - **The Protocol (Local-First Scripts)**: All script and code modifications must be done *exclusively* in the local files. The AI must never write script code directly to Roblox Studio via MCP.
-- **The Sync (User Copy-Paste)**: The user will copy and paste the updated script contents from the local folder into Roblox Studio.
+- **The Sync (Rojo, since Nov 25 2026)**: Local scripts sync live into Studio with Rojo (`tools/rojo/rojo.exe serve default.project.json`; Forest: `RescueForest/default.project.json --port 34873`). No more copy/paste. Never edit synced scripts inside Studio. Script file suffixes matter: `.server.lua` / `.client.lua` / `.lua` (module).
+- **Net registry**: all remotes/signals are declared in `ReplicatedStorage/Modules/Net.lua`; use `Net.Remote()` / `Net.Signal()`, never raw strings. Debug prints use `Log.debug()` (toggle: ReplicatedStorage attribute `DebugLogs`).
 - **The Exception (Non-Script Objects via MCP)**: The AI will use the Roblox Studio MCP tools (like running Luau code) to inspect, place, and configure non-script objects (Parts, ProximityPrompts, Attributes, Tags, folder structures). This allows the AI to reference the game state as a source of truth without editing script code in Studio.
 - **The Verification**: Always verify that the local codebase has been modified before notifying the user of needed copy-paste operations.
 
@@ -65,7 +66,7 @@ PRIMARY: The local folder is the absolute Source of Truth for all scripts/files.
 ---
 
 ### 🤝 How We Work Together (AI + Human)
-1.  **AI writes local scripts**: The AI writes/updates scripts only in the local directory. It explains precisely what it changed, so the human can copy/paste it into Studio.
+1.  **AI writes local scripts**: The AI writes/updates scripts only in the local directory. Rojo syncs them into Studio automatically; the AI explains what changed and verifies in Studio via MCP (read-only for scripts).
 2.  **AI handles object manipulation via MCP**: The AI uses the Roblox Studio MCP tools to inspect the game tree, place models/parts, configure ProximityPrompts, and check current world state properties.
 3.  **Surgical Changes**: Fix one feature/bug at a time. Never delete, rewrite, or leave out unrelated code, imports, or local declarations.
 4.  **No Regression Search**: Before modifying functions or scripts, the AI must search the codebase for references to those symbols or systems to ensure no external dependencies are broken.

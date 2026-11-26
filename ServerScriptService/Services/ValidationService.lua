@@ -63,4 +63,18 @@ function ValidationService.RunChecks()
 	return errors == 0
 end
 
+-- Run AFTER all services have initialized (many create their remotes in Initialize).
+function ValidationService.CheckNet()
+	local Net = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net"))
+	local problems = Net.Audit()
+	if #problems == 0 then
+		print("[Validation] ✅ Net registry matches all remotes and signals.")
+	else
+		for _, p in ipairs(problems) do
+			warn("[Validation] ⚠️ Net: " .. p)
+		end
+	end
+	return #problems == 0
+end
+
 return ValidationService

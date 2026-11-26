@@ -1,5 +1,7 @@
 local FeederVisualService = {}
 
+local Net = require(game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Net"))
+
 -- Safely gets CFrame and Size of a Part or Model
 local function getPartOrModelCFrameAndSize(instance)
 	if not instance then return nil, nil end
@@ -111,15 +113,13 @@ local function updateFeederVisuals(exhibit)
 		local char = player.Character
 		local hasBag = char and char:FindFirstChild("FeedBag")
 		if not hasBag then
-			local TycoonService = require(game:GetService("ServerScriptService").Services.TycoonService)
-			TycoonService.UpdateStatus(player, "⚠️ Equip your Feed Bag to refill this!")
+			Net.Signal("ShowStatus"):Fire(player, "⚠️ Equip your Feed Bag to refill this!")
 			return
 		end
 
 		local leafCount = player:GetAttribute("LeafCount") or 0
 		if leafCount <= 0 then
-			local TycoonService = require(game:GetService("ServerScriptService").Services.TycoonService)
-			TycoonService.UpdateStatus(player, "⚠️ Your Feed Bag is empty! Gather some leaves first.")
+			Net.Signal("ShowStatus"):Fire(player, "⚠️ Your Feed Bag is empty! Gather some leaves first.")
 			return
 		end
 		
@@ -127,20 +127,19 @@ local function updateFeederVisuals(exhibit)
 		local currentMaxFood = exhibit:GetAttribute("MaxFoodLevel") or 100
 		
 		if currentFood >= currentMaxFood then
-			local TycoonService = require(game:GetService("ServerScriptService").Services.TycoonService)
-			TycoonService.UpdateStatus(player, "✅ Feeder is already full!")
+			Net.Signal("ShowStatus"):Fire(player, "✅ Feeder is already full!")
 			return
 		end
 		
 		-- Deduct 1 leaf, add exactly 20% of max capacity
 		local foodPerLeaf = math.max(1, math.round(currentMaxFood * 0.2))
 		player:SetAttribute("LeafCount", leafCount - 1)
+		player:SetAttribute("ManualRefills", (player:GetAttribute("ManualRefills") or 0) + 1)
 		local newFood = math.min(currentMaxFood, currentFood + foodPerLeaf)
 		exhibit:SetAttribute("FoodLevel", newFood)
 		
 		local maxLeaves = player:GetAttribute("MaxLeaves") or 5
-		local TycoonService = require(game:GetService("ServerScriptService").Services.TycoonService)
-		TycoonService.UpdateStatus(player, string.format("🌿 Refilled! Food: %d/%d (Bag: %d/%d)", newFood, currentMaxFood, leafCount - 1, maxLeaves))
+		Net.Signal("ShowStatus"):Fire(player, string.format("🌿 Refilled! Food: %d/%d (Bag: %d/%d)", newFood, currentMaxFood, leafCount - 1, maxLeaves))
 	end)
 end
 

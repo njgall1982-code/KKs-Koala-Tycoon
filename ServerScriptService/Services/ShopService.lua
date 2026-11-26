@@ -10,6 +10,9 @@ local signals = ServerStorage:WaitForChild("Signals")
 local transactionRequest = signals:WaitForChild("TransactionRequest")
 local awardTool = signals:WaitForChild("AwardTool")
 
+local GameConstants = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("GameConstants"))
+local FEED_BAG = GameConstants.FeedBag
+
 local connections = {} -- toolShed -> connection
 
 local TOOL_PRICES = {
@@ -87,9 +90,13 @@ function ShopService.HandlePurchaseRequest(player, toolName, price)
     
     local expectedPrice = TOOL_PRICES[toolName]
     if toolName == "FeedBagUpgrade" then
-        local maxLeaves = player:GetAttribute("MaxLeaves") or 5
-        local upgradeLevel = (maxLeaves - 5) / 5
-        expectedPrice = 250 * (upgradeLevel + 1)
+        local maxLeaves = player:GetAttribute("MaxLeaves") or FEED_BAG.BASE_CAPACITY
+        if maxLeaves >= FEED_BAG.MAX_CAPACITY then
+            purchaseEvent:FireClient(player, false, toolName, "Feed Bag is already at max capacity (" .. FEED_BAG.MAX_CAPACITY .. ")!")
+            return
+        end
+        local upgradeLevel = math.floor((maxLeaves - FEED_BAG.BASE_CAPACITY) / FEED_BAG.UPGRADE_STEP)
+        expectedPrice = FEED_BAG.BASE_UPGRADE_PRICE * (upgradeLevel + 1)
     elseif toolName == "MilkBottle" then
         local KoalaConfig = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("KoalaConfig"))
         local ownedCount = player:GetAttribute("OwnedKoalasCount") or 0
@@ -118,8 +125,8 @@ function ShopService.HandlePurchaseRequest(player, toolName, price)
 	
     if success then
         if toolName == "FeedBagUpgrade" then
-            local currentMax = player:GetAttribute("MaxLeaves") or 5
-            player:SetAttribute("MaxLeaves", currentMax + 5)
+            local currentMax = player:GetAttribute("MaxLeaves") or FEED_BAG.BASE_CAPACITY
+            player:SetAttribute("MaxLeaves", math.min(currentMax + FEED_BAG.UPGRADE_STEP, FEED_BAG.MAX_CAPACITY))
         else
             awardTool:Fire(player, toolName, not consumable)
             if toolName == "MilkBottle" then

@@ -1,12 +1,14 @@
 local KoalaLifecycle = {}
 
+local Log = require(game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Log"))
+local Net = require(game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Net"))
+
 local CollectionService = game:GetService("CollectionService")
 local ServerStorage    = game:GetService("ServerStorage")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local KoalaConfig = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("KoalaConfig"))
 local KoalaVFX    = require(game:GetService("ServerScriptService"):WaitForChild("Modules"):WaitForChild("KoalaVFX"))
-local KoalaSystem = require(game:GetService("ServerScriptService"):WaitForChild("Services"):WaitForChild("KoalaSystem"))
 
 -- ============================================================
 -- HELPERS
@@ -86,7 +88,7 @@ function KoalaLifecycle.InitKoala(koala, rarityName, startAge)
 	KoalaVFX.ApplyRarityAura(koala, rarityVal.Value)
 
 	-- Instant Bone Initialization: Ensure zero delay/contortion on spawn
-	KoalaSystem.InitKoala(koala)
+	Net.Signal("InitKoalaAI"):Fire(koala)
 end
 
 function KoalaLifecycle.SwapModel(oldKoala, newStageName)
@@ -116,11 +118,10 @@ function KoalaLifecycle.SwapModel(oldKoala, newStageName)
 	local oldHat = oldKoala:GetAttribute("EquippedOutfit_Hat") or oldKoala:GetAttribute("EquippedOutfit") or ""
 	local oldNeck = oldKoala:GetAttribute("EquippedOutfit_Necklace") or ""
 
-	-- DEBUG: Log before swap
-	print("[KoalaLifecycle.SwapModel] GROWTH DEBUG:")
-	print("  - Old koala HRP Y: " .. (oldKoala:FindFirstChild("HumanoidRootPart") and oldKoala:FindFirstChild("HumanoidRootPart").Position.Y or "nil"))
-	print("  - Old pivot Y: " .. oldPos.Position.Y)
-	print("  - New template WorldPivot Y: " .. template.WorldPivot.Position.Y)
+	-- Debug (enable with ReplicatedStorage attribute DebugLogs = true)
+	Log.debug("KoalaLifecycle.SwapModel", "growth: old HRP Y=%s | old pivot Y=%s | template WorldPivot Y=%s",
+		tostring(oldKoala:FindFirstChild("HumanoidRootPart") and oldKoala.HumanoidRootPart.Position.Y),
+		tostring(oldPos.Position.Y), tostring(template.WorldPivot.Position.Y))
 
 	-- Spawn new model
 	local newKoala = template:Clone()
@@ -140,13 +141,11 @@ function KoalaLifecycle.SwapModel(oldKoala, newStageName)
 
 	newKoala.Parent = oldKoala.Parent or workspace
 	
-	-- DEBUG: Log before PivotTo
-	print("  - New koala HRP before PivotTo Y: " .. newKoala:FindFirstChild("HumanoidRootPart").Position.Y)
+	Log.debug("KoalaLifecycle.SwapModel", "new HRP before PivotTo Y=%s", tostring(newKoala:FindFirstChild("HumanoidRootPart").Position.Y))
 	
 	newKoala:PivotTo(oldPos)
 	
-	-- DEBUG: Log after PivotTo
-	print("  - New koala HRP after PivotTo Y: " .. newKoala:FindFirstChild("HumanoidRootPart").Position.Y)
+	Log.debug("KoalaLifecycle.SwapModel", "new HRP after PivotTo Y=%s", tostring(newKoala:FindFirstChild("HumanoidRootPart").Position.Y))
 
 	-- Init lifecycle stats
 	KoalaLifecycle.InitKoala(newKoala, oldRarity, oldAge)
@@ -155,12 +154,11 @@ function KoalaLifecycle.SwapModel(oldKoala, newStageName)
 	-- Re-equip outfits if this is now an adult
 	local newStage = newKoala:GetAttribute("Stage") or 1
 	if newStage == 4 then
-		local KoalaOutfitService = require(game:GetService("ServerScriptService").Services.KoalaOutfitService)
 		if oldHat ~= "" then
-			KoalaOutfitService.EquipOutfit(newKoala, oldHat)
+			Net.Signal("EquipOutfit"):Fire(newKoala, oldHat)
 		end
 		if oldNeck ~= "" then
-			KoalaOutfitService.EquipOutfit(newKoala, oldNeck)
+			Net.Signal("EquipOutfit"):Fire(newKoala, oldNeck)
 		end
 	else
 		newKoala:SetAttribute("EquippedOutfit_Hat", nil)
@@ -229,16 +227,13 @@ function KoalaLifecycle.RespawnAt(oldKoala, pos, parent)
 	-- Position koala at the spawn point
 	-- The mesh PivotOffset already accounts for visual positioning
 	
-	-- DEBUG: Log spawn positioning
-	print("[KoalaLifecycle.RespawnAt] SPAWN DEBUG:")
-	print("  - Template WorldPivot Y: " .. template.WorldPivot.Position.Y)
-	print("  - Spawn position Y: " .. pos.Y)
-	print("  - HRP before PivotTo Y: " .. newKoala:FindFirstChild("HumanoidRootPart").Position.Y)
+	Log.debug("KoalaLifecycle.RespawnAt", "template WorldPivot Y=%s | spawn Y=%s | HRP before PivotTo Y=%s",
+		tostring(template.WorldPivot.Position.Y), tostring(pos.Y), tostring(newKoala:FindFirstChild("HumanoidRootPart").Position.Y))
 	
 	newKoala:PivotTo(CFrame.new(pos))
 	
-	print("  - HRP after PivotTo Y: " .. newKoala:FindFirstChild("HumanoidRootPart").Position.Y)
-	print("  - Model GetPivot Y: " .. newKoala:GetPivot().Position.Y)
+	Log.debug("KoalaLifecycle.RespawnAt", "HRP after PivotTo Y=%s | model pivot Y=%s",
+		tostring(newKoala:FindFirstChild("HumanoidRootPart").Position.Y), tostring(newKoala:GetPivot().Position.Y))
 
 	if parent then 
 		newKoala.Parent = parent 
@@ -250,12 +245,11 @@ function KoalaLifecycle.RespawnAt(oldKoala, pos, parent)
 	-- Re-equip outfits if this is an adult
 	local newStage = newKoala:GetAttribute("Stage") or 1
 	if newStage == 4 then
-		local KoalaOutfitService = require(game:GetService("ServerScriptService").Services.KoalaOutfitService)
 		if oldHat ~= "" then
-			KoalaOutfitService.EquipOutfit(newKoala, oldHat)
+			Net.Signal("EquipOutfit"):Fire(newKoala, oldHat)
 		end
 		if oldNeck ~= "" then
-			KoalaOutfitService.EquipOutfit(newKoala, oldNeck)
+			Net.Signal("EquipOutfit"):Fire(newKoala, oldNeck)
 		end
 	else
 		newKoala:SetAttribute("EquippedOutfit_Hat", nil)

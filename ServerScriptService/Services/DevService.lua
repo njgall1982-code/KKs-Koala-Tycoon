@@ -2,6 +2,7 @@
 -- Handles server-side dev actions triggered by the DevWand UI or RemoteEvents
 
 local Players = game:GetService("Players")
+local Log = require(game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Log"))
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local CollectionService = game:GetService("CollectionService")
@@ -101,16 +102,13 @@ function DevService.Initialize()
 				CollectionService:AddTag(koala, "KoalaNPC")
 				koala.Parent = workspace
 				
-				-- DEBUG: Log spawn positioning
+				-- Debug (enable with ReplicatedStorage attribute DebugLogs = true)
 				local targetPos = player.Character:GetPivot() * CFrame.new(0, 5, -5)
-				print("[DevService] SPAWN DEBUG:")
-				print("  - Template WorldPivot Y: " .. template.WorldPivot.Position.Y)
-				print("  - Target position Y: " .. targetPos.Position.Y)
-				print("  - Player pivot Y: " .. player.Character:GetPivot().Position.Y)
-				print("  - Offset: +5 studs above player")
+				Log.debug("DevService", "spawn: template WorldPivot Y=%s | target Y=%s | player pivot Y=%s",
+					tostring(template.WorldPivot.Position.Y), tostring(targetPos.Position.Y), tostring(player.Character:GetPivot().Position.Y))
 				
 				koala:PivotTo(targetPos)
-				print("  - Koala HRP after PivotTo Y: " .. koala:FindFirstChild("HumanoidRootPart").Position.Y)
+				Log.debug("DevService", "koala HRP after PivotTo Y=%s", tostring(koala:FindFirstChild("HumanoidRootPart").Position.Y))
 				koala:ScaleTo(d.scale)
 
 				KoalaLifecycle.InitKoala(koala, rarity, d.age)

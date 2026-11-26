@@ -1,6 +1,6 @@
 -- [VERSION 2.0 - SIMPLIFIED TYCOON]
-local ServerScriptService = game:GetService("ServerScriptService")
-local CarryService = require(ServerScriptService.Services.CarryService)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Net = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net"))
 local tool = script.Parent
 local remote = tool:WaitForChild("CrateAction")
 
@@ -12,7 +12,7 @@ tool.Equipped:Connect(function()
 	local koala = tool:FindFirstChildOfClass("Model")
 	local koalaName = koala and koala.Name or "Koala"
 	player:SetAttribute("Carrying", koalaName)
-	CarryService.SetArms(player, true)
+	Net.Signal("CarryAction"):Fire("SetArms", player, true)
 end)
 
 tool.Unequipped:Connect(function()
@@ -30,7 +30,7 @@ tool.Unequipped:Connect(function()
 		if not koala or currentCarrying == koala.Name or currentCarrying == "Koala" then
 			player:SetAttribute("Carrying", nil)
 		end
-		CarryService.SetArms(player, false)
+		Net.Signal("CarryAction"):Fire("SetArms", player, false)
 	end
 end)
 
@@ -46,7 +46,7 @@ remote.OnServerEvent:Connect(function(player, action, data)
 		local en = type(d) == "table" and d.exhibitName or nil
 		if (pos - dp).Magnitude < 50 then
 			local koala = tool:FindFirstChildOfClass("Model")
-			CarryService.Drop(player, CFrame.new(dp + Vector3.new(0, 1, 0)), en, koala, tool)
+			Net.Signal("CarryAction"):Fire("Drop", player, CFrame.new(dp + Vector3.new(0, 1, 0)), en, koala, tool)
 		end
 	end
 end)

@@ -140,6 +140,7 @@ function ExhibitStatService.UpdateSign(exhibit)
 	local food = exhibit:GetAttribute("FoodLevel") or 0
 	local maxFood = exhibit:GetAttribute("MaxFoodLevel") or 100
 	local maxKoalas = exhibit:GetAttribute("MaxKoalas") or 10
+	local wasteCount = exhibit:GetAttribute("WasteCount") or 0
 	local displayName = exhibit:GetAttribute("DisplayName") or exhibit.Name:gsub("_Workspace", "")
 
 	frame.ExhibitName.Text = displayName
@@ -149,12 +150,19 @@ function ExhibitStatService.UpdateSign(exhibit)
 		foodText = string.format("%d/%d", food, maxFood)
 	end
 	
-	frame.Stats.Text = string.format("🐨 Koalas: %d/%d\n🥗 Food: %s", koalaCount, maxKoalas, foodText)
+	local wasteLine = ""
+	if wasteCount >= 2 then
+		wasteLine = string.format("\n🧹 Needs Cleaning (%d)", wasteCount)
+	elseif wasteCount == 1 then
+		wasteLine = "\n🧹 Waste: 1"
+	end
 
-	-- Color change based on food
-	if food < 20 then
+	frame.Stats.Text = string.format("🐨 Koalas: %d/%d\n🥗 Food: %s%s", koalaCount, maxKoalas, foodText, wasteLine)
+
+	-- Color change based on food & cleanliness
+	if food < 20 or wasteCount >= 4 then
 		frame.Stats.TextColor3 = Color3.fromRGB(255, 100, 100) -- Red alert
-	elseif food < 50 then
+	elseif food < 50 or wasteCount >= 2 then
 		frame.Stats.TextColor3 = Color3.fromRGB(255, 200, 100) -- Yellow warning
 	else
 		frame.Stats.TextColor3 = Color3.fromRGB(200, 255, 200) -- Green good

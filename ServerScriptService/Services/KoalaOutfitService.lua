@@ -369,6 +369,14 @@ function KoalaOutfitService.Initialize()
 		end
 	end
 
+	local Net = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net"))
+	Net.Signal("UnlockOutfit").Event:Connect(function(player, outfitName)
+		KoalaOutfitService.UnlockOutfit(player, outfitName)
+	end)
+	Net.Signal("EquipOutfit").Event:Connect(function(koala, outfitName)
+		KoalaOutfitService.EquipOutfit(koala, outfitName)
+	end)
+
 	print("[KoalaOutfitService] Initialized.")
 end
 

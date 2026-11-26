@@ -1,0 +1,23 @@
+{
+  "name": "KKsRescueForest",
+  "tree": {
+    "$className": "DataModel",
+
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "$ignoreUnknownInstances": true,
+      "Main": { "$path": "ServerScriptService/Main.server.lua" },
+      "Services": { "$path": "ServerScriptService/Services", "$ignoreUnknownInstances": true }
+    },
+
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "$ignoreUnknownInstances": true,
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "$path": "StarterPlayer/StarterPlayerScripts",
+        "$ignoreUnknownInstances": true
+      }
+    }
+  }
+}

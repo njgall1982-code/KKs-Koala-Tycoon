@@ -16,13 +16,6 @@ function EconomyService.Initialize()
 		if cash and cash.Value >= amount then
 			cash.Value -= amount
 			print(string.format("[EconomyService] Processed %s for %s: -$%d", reason, player.Name, amount))
-			
-			-- Visual feedback
-			local showStatus = Signals:FindFirstChild("ShowStatus")
-			if showStatus then
-				showStatus:Fire(player, "-$" .. amount .. " " .. reason, Color3.fromRGB(255, 50, 50))
-			end
-			
 			return true
 		end
 		return false, "Insufficient funds"
@@ -40,10 +33,12 @@ function EconomyService.Initialize()
 			currency.Value += amount
 			print(string.format("[EconomyService] %s +%d for %s", currencyType, amount, player.Name))
 			
-			-- Fire ShowStatus for visual feedback
-			local showStatus = Signals:FindFirstChild("ShowStatus")
-			if showStatus then
-				showStatus:Fire(player, "+" .. amount .. " " .. currencyType, Color3.fromRGB(0, 255, 0))
+			-- Fire ShowStatus for non-Cash currencies (Cash deltas are shown under the cash bar)
+			if currencyType ~= "Cash" then
+				local showStatus = Signals:FindFirstChild("ShowStatus")
+				if showStatus then
+					showStatus:Fire(player, "+" .. amount .. " " .. currencyType, Color3.fromRGB(0, 255, 0))
+				end
 			end
 		end
 	end)

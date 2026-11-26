@@ -12,13 +12,10 @@ pcall(function() PhysicsService:RegisterCollisionGroup("ExhibitGates") end)
 PhysicsService:CollisionGroupSetCollidable("Players", "ExhibitGates", false)
 PhysicsService:CollisionGroupSetCollidable("Koalas", "ExhibitGates", true)
 
+local Net = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net"))
+
 -- Pre-create TeleportNotification RemoteEvent to prevent client scripts from yielding
-local teleportNotification = ReplicatedStorage:FindFirstChild("TeleportNotification")
-if not teleportNotification then
-	teleportNotification = Instance.new("RemoteEvent")
-	teleportNotification.Name = "TeleportNotification"
-	teleportNotification.Parent = ReplicatedStorage
-end
+Net.Remote("TeleportNotification")
 
 -- 1. Load Validation Service First
 local ValidationService = require(ServerScriptService.Services.ValidationService)
@@ -56,23 +53,24 @@ local FeederVisualService = safeRequire(ServerScriptService.Services.FeederVisua
 local KoalaOutfitService = safeRequire(ServerScriptService.Services.KoalaOutfitService)
 local OutfitShopService = safeRequire(ServerScriptService.Services.OutfitShopService)
 local ZooTerminalService = safeRequire(ServerScriptService.Services.ZooTerminalService)
+local StaffService = safeRequire(ServerScriptService.Services.StaffService)
+local WasteService = safeRequire(ServerScriptService.Services.WasteService)
+local PoopBotService = safeRequire(ServerScriptService.Services.PoopBotService)
 
 -- New Refactored Services
 local KoalaSystem = safeRequire(ServerScriptService.Services.KoalaSystem)
 local TeleportToForest = safeRequire(ServerScriptService.Services.TeleportToForest)
 
 -- 4. Event Bus Listeners
-local signals = ServerStorage:WaitForChild("Signals")
-
 -- Force Pickup Listener
-signals:WaitForChild("ForcePickup").Event:Connect(function(player, model)
+Net.Signal("ForcePickup").Event:Connect(function(player, model)
 	if CarryService then
 		CarryService.PickUp(player, model)
 	end
 end)
 
 -- Tool Award Listener
-signals.AwardTool.Event:Connect(function(player, toolName, isPermanent)
+Net.Signal("AwardTool").Event:Connect(function(player, toolName, isPermanent)
 	if not player then return end
 	local toolTemplate = ServerStorage:FindFirstChild(toolName)
 	if toolTemplate then
@@ -134,12 +132,16 @@ safeInit(FeederVisualService, "FeederVisualService")
 safeInit(KoalaOutfitService, "KoalaOutfitService")
 safeInit(OutfitShopService, "OutfitShopService")
 safeInit(ZooTerminalService, "ZooTerminalService")
+safeInit(StaffService, "StaffService")
+safeInit(WasteService, "WasteService")
+safeInit(PoopBotService, "PoopBotService")
 
 -- New Services
 safeInit(KoalaSystem, "KoalaSystem")
 safeInit(TeleportToForest, "TeleportToForest")
 
 print("[Main] 🚀 ALL SYSTEMS INITIALIZED")
+if ValidationService.CheckNet then ValidationService.CheckNet() end
 
 -- 6. Player Lifecycle
 local function onPlayerAdded(player)
@@ -219,9 +221,9 @@ local function onPlayerAdded(player)
 			-- Send Welcome Message (only if tutorial not completed)
 			local hasExhibit = player:FindFirstChild("HasExhibit")
 			if hasExhibit and not hasExhibit.Value then
-				signals.UpdateQuest:Fire(player, "👋 Welcome! Repair Exhibit 1 🔨 then talk to the Head Vet 👨‍⚕️")
+				Net.Signal("UpdateQuest"):Fire(player, "👋 Welcome! Repair Exhibit 1 🔨 then talk to the Head Vet 👨‍⚕️")
 			else
-				signals.UpdateQuest:Fire(player, "")
+				Net.Signal("UpdateQuest"):Fire(player, "")
 			end
 		end)
 	end

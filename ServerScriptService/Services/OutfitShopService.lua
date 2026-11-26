@@ -4,6 +4,7 @@ local OutfitShopService = {}
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
+local CollectionService = game:GetService("CollectionService")
 local HttpService = game:GetService("HttpService")
 
 -- Ensure RemoteEvents exist
@@ -25,7 +26,7 @@ local signals = ServerStorage:WaitForChild("Signals")
 local transactionRequest = signals:WaitForChild("TransactionRequest")
 
 local OutfitShopConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("OutfitShopConfig"))
-local KoalaOutfitService = require(game:GetService("ServerScriptService"):WaitForChild("Services"):WaitForChild("KoalaOutfitService"))
+local Net = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net"))
 
 local connections = {}
 
@@ -50,7 +51,13 @@ end
 local function isVendorModel(model)
 	if not model:IsA("Model") then return false end
 	local name = model.Name:lower()
-	return name:find("outfit") or name:find("outift") or name == "koala vendor"
+	if name:find("equippedoutfit") then return false end
+	local parent = model.Parent
+	if parent and (CollectionService:HasTag(parent, "KoalaNPC") or parent:GetAttribute("Stage") ~= nil) then
+		return false
+	end
+	return ((name:find("outfit") or name:find("outift")) and (name:find("vendor") or name:find("shop")))
+		or name == "koala vendor"
 end
 
 local function attachPromptToVendor(vendor)
@@ -99,8 +106,8 @@ function OutfitShopService.Initialize()
 		-- Decoupled Transaction Request
 		local success, reason = transactionRequest:Invoke(player, config.Price, "BuyOutfit_" .. outfitName)
 		if success then
-			-- Grant the outfit via KoalaOutfitService
-			KoalaOutfitService.UnlockOutfit(player, outfitName)
+			-- Grant the outfit via UnlockOutfit signal
+			Net.Signal("UnlockOutfit"):Fire(player, outfitName)
 			purchaseOutfitEvent:FireClient(player, true, outfitName, "Purchase successful!")
 		else
 			purchaseOutfitEvent:FireClient(player, false, outfitName, reason or "Insufficient funds!")

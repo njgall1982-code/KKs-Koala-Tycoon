@@ -5,9 +5,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local CollectionService = game:GetService("CollectionService")
 
-local signals = ServerStorage:WaitForChild("Signals")
-local updateQuestSignal = signals:WaitForChild("UpdateQuest")
-local forcePickupSignal = signals:WaitForChild("ForcePickup")
+local Net = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net"))
+local updateQuestSignal = Net.Signal("UpdateQuest")
+local forcePickupSignal = Net.Signal("ForcePickup")
 
 local playerRepairs = {}
 
@@ -441,6 +441,15 @@ function TycoonService.Initialize()
 				TycoonService.HandleVetInteraction(player) 
 			end)
 		end
+	end
+
+	if not TycoonService._statusConnected then
+		TycoonService._statusConnected = true
+		Net.Signal("ShowStatus").Event:Connect(function(player, message)
+			if player and message then
+				TycoonService.UpdateStatus(player, message)
+			end
+		end)
 	end
 
 	print("[TycoonService] Initialize() completed")

@@ -1,6 +1,9 @@
 -- KoalaSystem Module
 local KoalaSystem = {}
 
+local Log = require(game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Log"))
+local Net = require(game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Net"))
+
 local RunService = game:GetService("RunService")
 local CollectionService = game:GetService("CollectionService")
 local ServerStorage = game:GetService("ServerStorage")
@@ -154,14 +157,14 @@ local function initKoala(koala)
 		humanoid.HipHeight = 0
 	end
 
-	print(string.format("[KoalaSystem.InitDebug] Koala: %s | DisplayName: %s | HipHeight: %f | HRP.Y: %f | Mesh.Y: %f | Welded: %s",
+	Log.debug("KoalaSystem.Init", "Koala: %s | DisplayName: %s | HipHeight: %f | HRP.Y: %f | Mesh.Y: %f | Welded: %s",
 		koala.Name,
 		koala:GetAttribute("DisplayName") or "None",
 		humanoid.HipHeight,
 		hrp and hrp.Position.Y or 0,
 		rigRoot and rigRoot.Position.Y or 0,
 		tostring(rootWeld ~= nil)
-	))
+	)
 
 	if not koala:GetAttribute("AI_Disabled") then
 		for _, p in ipairs(koala:GetDescendants()) do
@@ -750,6 +753,9 @@ end
 
 function KoalaSystem.Initialize()
 	signals = ServerStorage:WaitForChild("Signals")
+	Net.Signal("InitKoalaAI").Event:Connect(function(koala)
+		KoalaSystem.InitKoala(koala)
+	end)
 	local scanTimer = 0
 
 	RunService.Heartbeat:Connect(function(dt)

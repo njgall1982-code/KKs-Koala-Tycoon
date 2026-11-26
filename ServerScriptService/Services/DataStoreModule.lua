@@ -77,11 +77,19 @@ function DataStore.SaveData(player)
 		unlockedDiagnosticsDecoded = HttpService:JSONDecode(unlockedDiagnosticsAttr)
 	end)
 
+	local hiredStaffAttr = player:GetAttribute("HiredStaff") or "{}"
+	local hiredStaffDecoded = {}
+	pcall(function()
+		hiredStaffDecoded = HttpService:JSONDecode(hiredStaffAttr)
+	end)
+
 	local data = {
 		Cash = leaderstats.Cash.Value,
 		Conservation = leaderstats.Conservation.Value,
 		HasExhibit = player:FindFirstChild("HasExhibit") and player.HasExhibit.Value or false,
 		LeafCount = player:GetAttribute("LeafCount") or 0,
+		ManualRefills = player:GetAttribute("ManualRefills") or 0,
+		HiredStaff = hiredStaffDecoded,
 		OwnedTools = {},
 		MilkBottles = player:GetAttribute("MilkBottles") or 0,
 		RescuedKoalas = finalRescued,
@@ -110,7 +118,8 @@ function DataStore.SaveData(player)
 				ExhibitLevel = exhibit:GetAttribute("ExhibitLevel") or 1,
 				FeederLevel = exhibit:GetAttribute("FeederLevel") or 1,
 				DisplayName = exhibit:GetAttribute("DisplayName") or "",
-				WeedsCleared = exhibit:GetAttribute("WeedsCleared") or false
+				WeedsCleared = exhibit:GetAttribute("WeedsCleared") or false,
+				HasPoopBot = exhibit:GetAttribute("HasPoopBot") or false
 			}
 		end
 	end
@@ -175,6 +184,8 @@ function DataStore.LoadData(player)
 		cons.Value = result.Conservation or 0
 		he.Value = result.HasExhibit or false
 		player:SetAttribute("LeafCount", result.LeafCount or 0)
+		player:SetAttribute("ManualRefills", result.ManualRefills or 0)
+		player:SetAttribute("HiredStaff", HttpService:JSONEncode(result.HiredStaff or {}))
 		player:SetAttribute("MilkBottles", result.MilkBottles or 0)
 		player:SetAttribute("RescuedKoalas", HttpService:JSONEncode(result.RescuedKoalas or {}))
 		player:SetAttribute("MaxLeaves", result.MaxLeaves or 5)
@@ -249,7 +260,7 @@ function DataStore.LoadData(player)
 					if currentCrates >= #currentRescued then return end
 
 					local KoalaLifecycle = require(game:GetService("ServerScriptService").Modules.KoalaLifecycle)
-					local CarryService = require(game:GetService("ServerScriptService").Services.CarryService)
+					local Net = require(game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Net"))
 					local CollectionService = game:GetService("CollectionService")
 					local folder = ServerStorage:FindFirstChild("Koalas to pick from") or ServerStorage
 					local template = folder:FindFirstChild("Koala Baby")
@@ -279,7 +290,7 @@ function DataStore.LoadData(player)
 							
 							task.wait(0.05) -- Small stabilization delay
 							
-							CarryService.WeldKoalaToCrate(crate, koala, kData)
+							Net.Signal("CarryAction"):Fire("WeldToCrate", crate, koala, kData)
 							print("[DataStore] 📦 Loaded and welded " .. (kData.DisplayName or "Koala") .. " (" .. (kData.Rarity or "Cute") .. ") into player's TransferCrate tool!")
 						else
 							warn("[DataStore] ❌ Koala Baby template missing. Cannot weld inside TransferCrate.")
@@ -421,5 +432,10 @@ pcall(function()
 		task.wait(2) -- Give time for async calls
 	end)
 end)
+
+local Net = require(game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Net"))
+Net.Signal("SavePlayerData").OnInvoke = function(player)
+	return DataStore.SaveData(player)
+end
 
 return DataStore

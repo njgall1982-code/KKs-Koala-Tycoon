@@ -15,6 +15,9 @@ local toolContainer = shopFrame and shopFrame:FindFirstChild("ToolContainer")
 local purchaseEvent = ReplicatedStorage:WaitForChild("PurchaseToolEvent")
 local openShopEvent = ReplicatedStorage:WaitForChild("OpenShopEvent")
 
+local GameConstants = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("GameConstants"))
+local FEED_BAG = GameConstants.FeedBag
+
 -- Track owned tools locally
 local ownedTools = {}
 
@@ -70,19 +73,27 @@ local function updateFeedBagCard(card)
 	local buyBtn = card:FindFirstChild("BuyButton")
 	if not buyBtn then return end
 
-	local maxLeaves = player:GetAttribute("MaxLeaves") or 5
-	local upgradeLevel = (maxLeaves - 5) / 5
-	local nextPrice = 250 * (upgradeLevel + 1)
+	local maxLeaves = player:GetAttribute("MaxLeaves") or FEED_BAG.BASE_CAPACITY
+	local isMaxed = maxLeaves >= FEED_BAG.MAX_CAPACITY
+	local upgradeLevel = math.floor((maxLeaves - FEED_BAG.BASE_CAPACITY) / FEED_BAG.UPGRADE_STEP)
+	local nextPrice = FEED_BAG.BASE_UPGRADE_PRICE * (upgradeLevel + 1)
 
-	buyBtn:SetAttribute("Price", nextPrice)
 	buyBtn:SetAttribute("ToolName", "FeedBagUpgrade")
-	buyBtn.Text = "BUY"
-	buyBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-	buyBtn.Active = true
+	if isMaxed then
+		buyBtn:SetAttribute("Price", nil)
+		buyBtn.Text = "MAXED"
+		buyBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+		buyBtn.Active = false
+	else
+		buyBtn:SetAttribute("Price", nextPrice)
+		buyBtn.Text = "BUY"
+		buyBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+		buyBtn.Active = true
+	end
 
 	local priceLabel = card:FindFirstChild("Price")
 	if priceLabel and priceLabel:IsA("TextLabel") then
-		priceLabel.Text = "$" .. nextPrice
+		priceLabel.Text = isMaxed and "MAX" or ("$" .. nextPrice)
 	end
 
 	local iconLabel = findIconLabel(card)
@@ -97,7 +108,12 @@ local function updateFeedBagCard(card)
 
 	local descLabel = findDescLabel(card)
 	if descLabel then
-		descLabel.Text = string.format("Holds food to feed koalas! Capacity: %d (+5)", maxLeaves + 5)
+		if isMaxed then
+			descLabel.Text = string.format("Holds food to feed koalas! Max Capacity: %d", maxLeaves)
+		else
+			local nextCapacity = math.min(maxLeaves + FEED_BAG.UPGRADE_STEP, FEED_BAG.MAX_CAPACITY)
+			descLabel.Text = string.format("Holds food to feed koalas! Capacity: %d -> %d (+%d)", maxLeaves, nextCapacity, FEED_BAG.UPGRADE_STEP)
+		end
 	end
 end
 
@@ -155,6 +171,7 @@ local function setupFeedBagUpgrade()
 			local buyBtn = card:FindFirstChild("BuyButton")
 			if buyBtn then
 				buyBtn.MouseButton1Click:Connect(function()
+					if not buyBtn.Active then return end
 					local toolName = buyBtn:GetAttribute("ToolName")
 					local price = buyBtn:GetAttribute("Price")
 					if toolName and price then

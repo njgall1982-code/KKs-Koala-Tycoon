@@ -17,14 +17,20 @@ function CarryService.Initialize()
 		end
 	end)
 
-	-- Handle CuddleRequest
-	local signals = game:GetService("ServerStorage"):FindFirstChild("Signals")
-	local cuddleRequest = signals and signals:FindFirstChild("CuddleRequest")
-	if cuddleRequest then
-		cuddleRequest.Event:Connect(function(player, koala)
-			CarryService.PerformCuddle(player, koala)
-		end)
-	end
+	-- Handle CuddleRequest & CarryAction signals
+	local Net = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net"))
+	Net.Signal("CuddleRequest").Event:Connect(function(player, koala)
+		CarryService.PerformCuddle(player, koala)
+	end)
+	Net.Signal("CarryAction").Event:Connect(function(action, ...)
+		if action == "SetArms" then
+			CarryService.SetArms(...)
+		elseif action == "Drop" then
+			CarryService.Drop(...)
+		elseif action == "WeldToCrate" then
+			CarryService.WeldKoalaToCrate(...)
+		end
+	end)
 	print("[CarryService] Initialized.")
 end
 

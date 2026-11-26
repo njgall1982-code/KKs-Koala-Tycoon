@@ -153,7 +153,34 @@ function KoalaConfig.CalculateHappiness(koala, exhibit)
 	end
 
 	local total = math.clamp(math.floor(foodScore + cuddleScore + socialScore), 0, 100)
+
+	-- 4. Exhibit Cleanliness Penalty (0 to -50 points when waste exceeds grace count)
+	if exhibit then
+		local wasteCount = exhibit:GetAttribute("WasteCount") or 0
+		local penalty = KoalaConfig.CalculateCleanlinessPenalty(wasteCount)
+		total = math.clamp(total - penalty, 0, 100)
+	end
+
 	return total
+end
+
+-- ============================================================
+-- WASTE / CLEANLINESS CONFIG
+-- ============================================================
+KoalaConfig.WASTE_INTERVAL_MIN = 45       -- Minimum seconds between a koala producing waste
+KoalaConfig.WASTE_INTERVAL_MAX = 90       -- Maximum seconds between a koala producing waste
+KoalaConfig.MAX_WASTE_PER_EXHIBIT = 10    -- Cap waste piles per exhibit
+KoalaConfig.WASTE_GRACE_COUNT = 1         -- 1 pile is tolerated; 2+ piles start reducing happiness
+KoalaConfig.WASTE_PENALTY_PER_PILE = 10   -- Happiness points lost per waste pile above grace
+KoalaConfig.WASTE_MAX_PENALTY = 50        -- Maximum happiness penalty from filthiness
+
+function KoalaConfig.CalculateCleanlinessPenalty(wasteCount)
+	local count = wasteCount or 0
+	if count <= KoalaConfig.WASTE_GRACE_COUNT then
+		return 0
+	end
+	local excess = count - KoalaConfig.WASTE_GRACE_COUNT
+	return math.min(excess * KoalaConfig.WASTE_PENALTY_PER_PILE, KoalaConfig.WASTE_MAX_PENALTY)
 end
 
 -- Converts happiness score to revenue multiplier
